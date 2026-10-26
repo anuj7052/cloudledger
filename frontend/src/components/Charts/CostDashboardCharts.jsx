@@ -164,9 +164,14 @@ export function SpendOverTime({ series, daily, loading, error, currency, onRetry
     if (row) onSelect(row.key);
   };
   const chartProps = { data: rows, margin: { top: 8, right: 8, left: 0, bottom: 0 }, onClick: pick, style: clickable ? { cursor: 'pointer' } : undefined };
-  const noteDots = rows.filter(row => notes?.[row.key]?.length).map(row => {
+  const noteDots = rows.filter(row => notes?.[row.key]?.length).flatMap(row => {
     const po = notes[row.key].some(n => n.source === 'billing' || n.linked_service);
-    return <ReferenceDot key={`note-${row.key}`} x={row.label} y={row.total} r={po ? 7 : 5} fill={po ? '#ea580c' : '#eab308'} stroke="var(--color-slate-900)" strokeWidth={2} ifOverflow="extendDomain" />;
+    const color = po ? '#ea580c' : '#eab308';
+    return [
+      // Soft halo so the marker is noticed at a glance, then the solid dot.
+      <ReferenceDot key={`halo-${row.key}`} x={row.label} y={row.total} r={18} fill={color} fillOpacity={0.22} stroke={color} strokeOpacity={0.5} strokeWidth={2} ifOverflow="extendDomain" />,
+      <ReferenceDot key={`note-${row.key}`} x={row.label} y={row.total} r={10} fill={color} stroke="#ffffff" strokeWidth={3} ifOverflow="extendDomain" />,
+    ];
   });
   const tooltip = <Tooltip content={<DetailTooltip currency={currency} daily={daily} keys={keys} colors={colors} notes={notes} clickable={clickable} />} cursor={{ fill: 'rgba(234,88,12,0.08)', stroke: '#EA580C', strokeWidth: 1 }} />;
   const yAxis = <YAxis tick={axis} tickLine={false} axisLine={false} width={76} tickFormatter={value => formatAmount(value, currency)} />;
