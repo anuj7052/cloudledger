@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/cost-notes", tags=["cost notes"])
 
 COLORS = ("yellow", "orange", "blue", "green", "pink")
 MAX_RANGE_DAYS = 800
-FIELDS = "id,tenant_id,subscription_id,note_date,body,color,author_id,author_name,created_at,updated_at"
+FIELDS = "id,tenant_id,subscription_id,note_date,body,color,author_id,author_name,created_at,updated_at,source,linked_service_id"
 
 
 def _day(value: str) -> str:
@@ -102,6 +102,13 @@ async def list_notes(
     wanted = set(subscription_ids)
     if wanted:
         rows = [note for note in rows if not note["subscription_id"] or note["subscription_id"] in wanted]
+    linked = {n["linked_service_id"] for n in rows if n.get("linked_service_id")}
+    if linked:
+        marks = ",".join("?" for _ in linked)
+        cursor = await db.execute(f"SELECT id,name,po_number,po_date,boq_ref FROM billing_services WHERE owner_id=? AND id IN ({marks})", (user["account_id"], *linked))
+        services = {r[0]: {"id": r[0], "name": r[1], "po_number": r[2], "po_date": r[3], "boq_ref": r[4]} for r in await cursor.fetchall()}
+        for note in rows:
+            note["linked_service"] = services.get(note.get("linked_service_id"))
     return {"notes": rows}
 
 

@@ -18,3 +18,14 @@ SCHEMAS = {
 INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_cost_notes_lookup ON cost_notes(owner_id,tenant_id,note_date)",
 ]
+
+# Columns added after release. service_key identifies notes written automatically
+# from an Azure Billing service (PO/BOQ); linked_service_id is an admin's manual
+# "this note is explained by that PO" assignment.
+MIGRATIONS = {
+    "cost_notes": {
+        "source": "TEXT NOT NULL DEFAULT 'manual'",
+        "service_key": "TEXT NOT NULL DEFAULT ''",
+        "linked_service_id": "TEXT NOT NULL DEFAULT ''",
+    },
+}

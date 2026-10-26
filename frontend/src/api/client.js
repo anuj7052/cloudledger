@@ -1245,3 +1245,10 @@ export const downloadBillingServiceFile = id => api.get(`/billing/service-files/
 export const deleteBillingServiceFile = id => api.delete(`/billing/service-files/${encodeURIComponent(id)}`).then(r => r.data);
 export const addBillingServiceNote = (id, body) => api.post(`/billing/services/${encodeURIComponent(id)}/notes`, { body }).then(r => r.data);
 export const deleteBillingServiceNote = id => api.delete(`/billing/service-notes/${encodeURIComponent(id)}`).then(r => r.data);
+
+// Azure subscription ↔ billing customer mapping and PO/BOQ-linked cost notes.
+export const suggestBillingAzureLinks = body => api.post('/billing/azure-links/suggest', body).then(r => r.data);
+export const saveBillingAzureLink = body => api.put('/billing/azure-links', body).then(r => r.data);
+export const removeBillingAzureLink = (tenantId, subscriptionId) => api.delete('/billing/azure-links', { params: { tenant_id: tenantId, subscription_id: subscriptionId } }).then(r => r.data);
+export const listBillingAzureServices = (tenantId, subscriptionIds = []) => api.get('/billing/azure-links/services', { params: { tenant_id: tenantId, subscription_ids: subscriptionIds }, paramsSerializer: { indexes: null } }).then(r => r.data);
+export const assignCostNoteService = (noteId, serviceId) => api.put(`/billing/cost-notes/${encodeURIComponent(noteId)}/service`, { service_id: serviceId }).then(r => r.data);

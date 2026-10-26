@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Pencil, Search, StickyNote, Trash2, X } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
-import { createCostNote, deleteCostNote, fetchDayResources, listCostNotes, updateCostNote } from '../../api/client';
+import { assignCostNoteService, createCostNote, deleteCostNote, fetchDayResources, listBillingAzureServices, listCostNotes, updateCostNote } from '../../api/client';
+import { useCanAdminister } from '../../hooks/useCanAdminister';
 import { formatAmountFull } from '../../utils/currency';
 import { friendlyError } from '../../utils/apiError';
 import { NOTE_COLORS, noteColor, shiftDay, todayIso } from '../../utils/costNotes';
@@ -131,6 +132,21 @@ function ResourceList({ date, tenantId, subscriptionIds }) {
 
 function NotesPanel({ date, tenantId, subscriptionIds, subscriptions }) {
   const [notes, setNotes] = useState(null);
+  const admin = useCanAdminister();
+  const [services, setServices] = useState([]);
+  useEffect(() => {
+    if (!admin || !tenantId) return undefined;
+    let live = true;
+    listBillingAzureServices(tenantId, subscriptionIds).then(d => { if (live) setServices(d.items || []); }).catch(() => {});
+    return () => { live = false; };
+  }, [admin, tenantId, subscriptionIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  const assign = async (note, serviceId) => {
+    try {
+      await assignCostNoteService(note.id, serviceId);
+      const sv = services.find(x => x.id === serviceId);
+      setNotes(list => list.map(n => (n.id === note.id ? { ...n, linked_service_id: serviceId, linked_service: sv || null } : n)));
+    } catch { /* toast shown by caller elsewhere */ }
+  };
   const [error, setError] = useState('');
   const [draft, setDraft] = useState('');
   const [color, setColor] = useState('yellow');
@@ -215,7 +231,12 @@ function NotesPanel({ date, tenantId, subscriptionIds, subscriptions }) {
               {editing === note.id ? (
                 <EditNote note={note} onCancel={() => setEditing(null)} onSave={save} />
               ) : (
-                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{note.body}</p>
+                <>
+                  {note.source === 'billing' && <span className="mb-1 inline-block rounded-full bg-[#ea580c] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#ffffff]">PO / BOQ</span>}
+                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{note.body}</p>
+                  {note.linked_service && <p className="mt-1 text-xs font-semibold">↳ {note.linked_service.name}{note.linked_service.po_number ? ` · PO ${note.linked_service.po_number}` : ''}{note.linked_service.boq_ref ? ` · BOQ ${note.linked_service.boq_ref}` : ''}</p>}
+                  {admin && note.source !== 'billing' && services.length > 0 && <select aria-label="Assign PO / service" value={note.linked_service_id || ''} onChange={e => assign(note, e.target.value)} className="mt-2 w-full rounded border border-black/20 bg-[#ffffff]/70 px-1.5 py-1 text-xs"><option value="">Assign PO / service…</option>{services.map(sv => <option key={sv.id} value={sv.id}>{sv.customer} · {sv.name}{sv.po_number ? ` · PO ${sv.po_number}` : ''}</option>)}</select>}
+                </>
               )}
               <div className="mt-2 flex items-center justify-between gap-2 text-[11px] opacity-80">
                 <span className="truncate">{note.author_name}{note.subscription_id ? ` · ${names[note.subscription_id] || 'Unnamed subscription'}` : ' · whole tenant'}</span>

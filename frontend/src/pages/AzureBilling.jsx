@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowUpRight, Building2, CheckCircle2, Download, Plus, Search, Upload, Settings, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Building2, Link2, CheckCircle2, Download, Plus, Search, Upload, Settings, Trash2 } from 'lucide-react';
 import * as api from '../api/client';
 import { errorMessage } from '../utils/apiError';
 import { billingMoney, billingMonth, documentStatus } from '../utils/billingPresentation';
 import BillingLedger, { LedgerImport } from '../components/Common/BillingLedger';
 import BillingServices from '../components/Common/BillingServices';
+import AzureLinks from '../components/Common/AzureLinks';
 import { BillingPage, BillingNotice, BillingEmpty, billingInput as input, billingButton as primary, billingSecondary as secondary, billingPanel as panel } from '../components/billing-ui/workspace';
 
 const TYPES = { customer: 'Customer invoice', distributor: 'Distributor invoice', azure_usage: 'Azure usage bill' };
@@ -135,8 +136,9 @@ export default function AzureBilling() {
     if (typed.trim().toUpperCase() !== 'DELETE') { setError('You did not type DELETE, so nothing was deleted.'); return; }
     run(async () => { const r = await api.deleteBillingItem('customer', item.id, 'DELETE'); await load(); setError(''); window.alert(`Deleted ${item.name} (${r.subscriptions} subscriptions, ${r.entries} monthly entries).`); });
   };
+  if (params.get('map') === '1') return <BillingPage title="Azure mapping" description="Link Azure subscriptions to billing customers." actions={<Link className={secondary} to="/azure-billing"><ArrowLeft size={15} />All customers</Link>}><AzureLinks canEdit={!!settings.can_edit} /></BillingPage>;
   const shown = customers.filter(item => (showArchived ? !!item.archived : !item.archived) && `${item.name} ${item.company} ${item.contact_email}`.toLowerCase().includes(search.trim().toLowerCase()));
-  return <BillingPage title="Customers" description="Choose a company to see its monthly billing or add a new bill." actions={settings.can_edit && <><button className={secondary} onClick={() => setImporting(v => !v)}><Upload size={16} />Import spreadsheet</button><button className={primary} onClick={() => setAdding(v => !v)}><Plus size={16} />Add customer</button></>}>
+  return <BillingPage title="Customers" description="Choose a company to see its monthly billing or add a new bill." actions={settings.can_edit && <><Link className={secondary} to="/azure-billing?map=1"><Link2 size={16} />Map Azure subscriptions</Link><button className={secondary} onClick={() => setImporting(v => !v)}><Upload size={16} />Import spreadsheet</button><button className={primary} onClick={() => setAdding(v => !v)}><Plus size={16} />Add customer</button></>}>
     {error && <BillingNotice error>{error}</BillingNotice>}{id && !customer && <BillingNotice error>That customer could not be found in this workspace.</BillingNotice>}
     {adding && settings.can_edit && <section className={panel}><h2 className="mb-5 text-lg font-semibold">New customer</h2><CompanyForm busy={busy} onCancel={() => setAdding(false)} onSave={async form => run(async () => { const created = await api.createBillingCustomer(form); await load(); setParams({ customer: created.id }); setAdding(false); })} /></section>}
     {importing && settings.can_edit && <LedgerImport onImported={load} />}

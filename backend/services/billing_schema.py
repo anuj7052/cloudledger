@@ -90,6 +90,14 @@ SCHEMAS = {
         service_id TEXT NOT NULL REFERENCES billing_services(id), body TEXT NOT NULL,
         author TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
     )""",
+    "billing_azure_links": """CREATE TABLE IF NOT EXISTS billing_azure_links (
+        owner_id INTEGER NOT NULL REFERENCES users(id),
+        tenant_id TEXT NOT NULL, subscription_id TEXT NOT NULL, azure_name TEXT NOT NULL DEFAULT '',
+        customer_id TEXT NOT NULL, workload_id TEXT NOT NULL DEFAULT '',
+        method TEXT NOT NULL DEFAULT 'auto', score REAL NOT NULL DEFAULT 0,
+        updated_by TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+        PRIMARY KEY(owner_id, tenant_id, subscription_id)
+    )""",
     "billing_changes": """CREATE TABLE IF NOT EXISTS billing_changes (
         id TEXT PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id), entity_type TEXT NOT NULL,
         entity_id TEXT NOT NULL, action TEXT NOT NULL, before_json TEXT NOT NULL, after_json TEXT NOT NULL,

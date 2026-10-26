@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from auth.dependencies import get_current_user, require_workspace_admin
 from core.db import get_db
 from services import billing_blob as blob, billing_ledger as ledger
+from services.billing_links import remove_service_notes, sync_service_notes
 
 router = APIRouter(prefix='/api/billing', tags=['Azure Billing services'])
 
@@ -103,6 +104,7 @@ async def create_service(customer_id: str, body: ServiceInput, user=Depends(requ
     key = str(uuid.uuid4())
     await db.execute(f'INSERT INTO billing_services(id,owner_id,customer_id,{",".join(FIELDS)},created_by) VALUES(?,?,?,{",".join("?" for _ in FIELDS)},?)', (key, owner, customer_id, *values(body), user['user_id']))
     await ledger.audit(db, owner, user['user_id'], 'service', key, 'create', {}, body.model_dump(mode='json'))
+    await sync_service_notes(db, owner, await service_for(db, owner, key), user)
     await db.commit()
     return {**await service_for(db, owner, key), 'files': [], 'notes': []}
 
@@ -114,6 +116,9 @@ async def update_service(service_id: str, body: ServiceInput, user=Depends(requi
     await check_subscription(db, owner, before['customer_id'], body.workload_id)
     await db.execute(f'UPDATE billing_services SET {",".join(f + "=?" for f in FIELDS)},updated_at=CURRENT_TIMESTAMP WHERE owner_id=? AND id=?', (*values(body), owner, service_id))
     await ledger.audit(db, owner, user['user_id'], 'service', service_id, 'update', before, body.model_dump(mode='json'))
+    if before['workload_id'] != body.workload_id:
+        await remove_service_notes(db, owner, service_id)
+    await sync_service_notes(db, owner, await service_for(db, owner, service_id), user)
     await db.commit()
     return await service_for(db, owner, service_id)
 
@@ -128,6 +133,7 @@ async def delete_service(service_id: str, user=Depends(require_workspace_admin),
         await blob.delete(owner, before['customer_id'], path)
     await db.execute('DELETE FROM billing_service_files WHERE owner_id=? AND service_id=?', (owner, service_id))
     await db.execute('DELETE FROM billing_service_notes WHERE owner_id=? AND service_id=?', (owner, service_id))
+    await remove_service_notes(db, owner, service_id)
     await db.execute('DELETE FROM billing_services WHERE owner_id=? AND id=?', (owner, service_id))
     await ledger.audit(db, owner, user['user_id'], 'service', service_id, 'delete', before, {'files_removed': len(paths)})
     await db.commit()

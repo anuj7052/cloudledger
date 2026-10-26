@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listCostNotes } from '../api/client';
 import { notesByDate } from '../utils/costNotes';
+import PoNotes from '../components/Charts/PoNotes';
 import { useAppStore } from '../store/useAppStore';
 import { ErrorState } from '../components/ui';
 import PricingSection from '../components/Cards/PricingSection';
@@ -133,6 +134,10 @@ export default function Dashboard() {
         notes={daily ? notes : undefined}
         onSelect={daily && !imported ? day => navigate(`/explorer?tab=day&date=${day}`) : undefined}
       />
+
+      <PoNotes tenantId={selectedTenantId} subscriptionIds={selectedSubscriptionIds} names={subscriptionNames}
+        from={daily && series.rows.length ? series.rows[0].key : costData?.months?.[0]?.month ? `${costData.months[0].month.slice(0, 7)}-01` : ''}
+        to={daily && series.rows.length ? series.rows.at(-1).key : costData?.months?.length ? `${costData.months.at(-1).month.slice(0, 7)}-31` : ''} />
 
       <div className="grid gap-6 xl:grid-cols-2">
         <SubscriptionSpend months={costData?.months} names={subscriptionNames} loading={costLoading} currency={currency} />
