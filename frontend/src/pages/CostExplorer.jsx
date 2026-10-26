@@ -21,6 +21,9 @@ import ServiceBreakdownChart from '../components/Charts/ServiceBreakdownChart';
 import { Button as UiButton, Input as UiInput, NativeSelect, Label as UiLabel, TabsList } from '../components/shadcn';
 import { Card as SCard, CardContent as SCardContent } from '../components/billing-ui/card';
 import { SpendOverTime } from '../components/Charts/CostDashboardCharts';
+import PoNotes from '../components/Charts/PoNotes';
+import { rowsRange, useCostNotes } from '../hooks/useCostNotes';
+import { notesForRows } from '../utils/costNotes';
 import { CostStrip } from '../components/Layout/CostNavigation';
 import { buildSeries } from '../utils/costDashboardSeries';
 import { GROUP_BY_OPTIONS, groupByLabel, groupedMonthPeriods, groupNeedsRows, pricingMonthPeriods } from '../utils/explorerGroupBy';
@@ -240,6 +243,10 @@ export default function CostExplorer() {
   const groupedSeries = useMemo(() => (groupedTrend ? buildSeries(groupBy === 'pricing_model' ? pricingMonthPeriods(pricingData?.months || []) : groupedMonthPeriods({
     groupBy, months: trendMonths, rows, filters, names: Object.fromEntries((subscriptions || []).map(sub => [sub.subscription_id, sub.display_name])),
   })) : null), [groupedTrend, groupBy, trendMonths, rows, filters, subscriptions, pricingData]);
+  const [explorerFrom, explorerTo] = rowsRange(groupedSeries?.rows || [], false);
+  const explorerNoteList = useCostNotes(imported ? '' : selectedTenantId, selectedSubscriptionIds, explorerFrom, explorerTo);
+  const explorerNotes = useMemo(() => notesForRows(explorerNoteList, groupedSeries?.rows || [], false), [explorerNoteList, groupedSeries]);
+  const explorerNames = useMemo(() => Object.fromEntries((subscriptions || []).map(x => [x.subscription_id, x.display_name])), [subscriptions]);
   const groupedFromRows = groupedTrend && groupNeedsRows(groupBy, trendMonths);
 
   const forecast = useMemo(
@@ -573,8 +580,10 @@ export default function CostExplorer() {
               error={costError}
               currency={currency}
               onRetry={() => loadCosts({ force: true })}
+              notes={explorerNotes}
             />
           )}
+          <PoNotes notes={explorerNoteList} names={explorerNames} />
 
           <Panel
             title={`Monthly spend (${trendMonths.length} returned ${trendMonths.length === 1 ? 'month' : 'months'})`}

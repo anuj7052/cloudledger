@@ -30,3 +30,17 @@ export function notesByDate(notes = []) {
   for (const note of notes) (out[note.note_date] ||= []).push(note);
   return out;
 }
+
+/** Notes keyed by chart row: day rows use the date, month rows the YYYY-MM prefix of their key. */
+export function notesForRows(notes = [], rows = [], daily = false) {
+  const out = {};
+  for (const row of rows) {
+    const key = String(row.key);
+    const hits = notes.filter(n => (daily ? n.note_date === key.slice(0, 10) : n.note_date.slice(0, 7) === key.slice(0, 7)));
+    if (hits.length) out[row.key] = hits;
+  }
+  return out;
+}
+
+/** True for notes that explain cost with a PO/BOQ (written from Azure Billing or linked by an owner). */
+export const isPoNote = note => note?.source === 'billing' || !!note?.linked_service;

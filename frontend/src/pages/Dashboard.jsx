@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { listCostNotes } from '../api/client';
-import { notesByDate } from '../utils/costNotes';
+import { notesForRows } from '../utils/costNotes';
+import { rowsRange, useCostNotes } from '../hooks/useCostNotes';
 import PoNotes from '../components/Charts/PoNotes';
 import { useAppStore } from '../store/useAppStore';
 import { ErrorState } from '../components/ui';
@@ -61,17 +61,9 @@ export default function Dashboard() {
   }, [daily, dailyData, dailyRg, costData]);
 
   const navigate = useNavigate();
-  const [notes, setNotes] = useState({});
-  const noteRange = daily && series.rows.length ? `${series.rows[0].key}|${series.rows.at(-1).key}` : '';
-  useEffect(() => {
-    if (!noteRange || !selectedTenantId) return undefined;
-    let live = true;
-    const [from, to] = noteRange.split('|');
-    listCostNotes({ tenant_id: selectedTenantId, from_date: from, to_date: to, subscription_ids: selectedSubscriptionIds })
-      .then(list => { if (live) setNotes(notesByDate(list)); })
-      .catch(() => { if (live) setNotes({}); });
-    return () => { live = false; };
-  }, [noteRange, selectedTenantId, selectedSubscriptionIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [noteFrom, noteTo] = rowsRange(series.rows, daily);
+  const noteList = useCostNotes(imported ? '' : selectedTenantId, selectedSubscriptionIds, noteFrom, noteTo);
+  const notes = useMemo(() => notesForRows(noteList, series.rows, daily), [noteList, series.rows, daily]);
 
   const subscriptionNames = useMemo(
     () => Object.fromEntries((subscriptions || []).map(sub => [sub.subscription_id, sub.display_name])),
@@ -131,13 +123,11 @@ export default function Dashboard() {
         error={daily ? dailyError : costError}
         currency={currency}
         onRetry={daily ? () => loadDailyCosts(null, { force: true }) : () => loadCosts({ force: true })}
-        notes={daily ? notes : undefined}
+        notes={notes}
         onSelect={daily && !imported ? day => navigate(`/explorer?tab=day&date=${day}`) : undefined}
       />
 
-      <PoNotes tenantId={selectedTenantId} subscriptionIds={selectedSubscriptionIds} names={subscriptionNames}
-        from={daily && series.rows.length ? series.rows[0].key : costData?.months?.[0]?.month ? `${costData.months[0].month.slice(0, 7)}-01` : ''}
-        to={daily && series.rows.length ? series.rows.at(-1).key : costData?.months?.length ? `${costData.months.at(-1).month.slice(0, 7)}-31` : ''} />
+      <PoNotes notes={noteList} names={subscriptionNames} />
 
       <div className="grid gap-6 xl:grid-cols-2">
         <SubscriptionSpend months={costData?.months} names={subscriptionNames} loading={costLoading} currency={currency} />

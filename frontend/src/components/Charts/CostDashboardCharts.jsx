@@ -107,7 +107,7 @@ function DetailTooltip({ active, payload, currency, daily, keys, colors, notes, 
         <ul className="mt-2 space-y-1 border-t border-white/10 pt-2">
           {notes[row.key].slice(0, 3).map(note => (
             <li key={note.id} className="flex gap-1.5 text-[11px] text-[#fde68a]">
-              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#eab308]" />
+              <span className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${note.source === 'billing' || note.linked_service ? 'bg-[#ea580c]' : 'bg-[#eab308]'}`} />
               <span className="line-clamp-2">{note.body}</span>
             </li>
           ))}
@@ -164,7 +164,10 @@ export function SpendOverTime({ series, daily, loading, error, currency, onRetry
     if (row) onSelect(row.key);
   };
   const chartProps = { data: rows, margin: { top: 8, right: 8, left: 0, bottom: 0 }, onClick: pick, style: clickable ? { cursor: 'pointer' } : undefined };
-  const noteDots = daily ? rows.filter(row => notes?.[row.key]?.length).map(row => <ReferenceDot key={`note-${row.key}`} x={row.label} y={row.total} r={5} fill="#eab308" stroke="var(--color-slate-900)" strokeWidth={2} ifOverflow="extendDomain" />) : null;
+  const noteDots = rows.filter(row => notes?.[row.key]?.length).map(row => {
+    const po = notes[row.key].some(n => n.source === 'billing' || n.linked_service);
+    return <ReferenceDot key={`note-${row.key}`} x={row.label} y={row.total} r={po ? 7 : 5} fill={po ? '#ea580c' : '#eab308'} stroke="var(--color-slate-900)" strokeWidth={2} ifOverflow="extendDomain" />;
+  });
   const tooltip = <Tooltip content={<DetailTooltip currency={currency} daily={daily} keys={keys} colors={colors} notes={notes} clickable={clickable} />} cursor={{ fill: 'rgba(234,88,12,0.08)', stroke: '#EA580C', strokeWidth: 1 }} />;
   const yAxis = <YAxis tick={axis} tickLine={false} axisLine={false} width={76} tickFormatter={value => formatAmount(value, currency)} />;
   const xAxis = <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={14} />;
@@ -173,7 +176,7 @@ export function SpendOverTime({ series, daily, loading, error, currency, onRetry
   return (
     <Card
       title={`${daily ? 'Daily' : 'Monthly'} spend by ${groupLabel.toLowerCase()}`}
-      description={description || (daily ? 'Each day of the selected month, split by Azure service. Hover a day for details, click it to see every resource. Yellow dots mark days with notes.' : 'Each month in the selected period, split by Azure service. Hover a month for details.')}
+      description={description || (daily ? 'Each day of the selected month, split by Azure service. Hover a day for details, click it to see every resource. Yellow dots mark days with notes.' : 'Each month in the selected period, split by Azure service. Hover a month for details. Dots mark months with notes (orange = PO / BOQ).')}
       icon={Layers}
       actions={
         <Segmented
