@@ -31,6 +31,9 @@ class WorkloadInput(BaseModel):
     revision: int = Field(default=1, ge=1)
 
 
+BILLING_TYPES = ('Azure usage', 'Monthly RI', 'One-time RI', 'Savings plan', 'Licence / subscription', 'Marketplace', 'Other')
+
+
 class EntryInput(BaseModel):
     period: str = Field(pattern=r'^\d{4}-(0[1-9]|1[0-2])$')
     currency: str = Field(pattern=r'^[A-Z]{3}$')
@@ -44,6 +47,7 @@ class EntryInput(BaseModel):
     status: Literal['recorded', 'needs_review'] = 'recorded'
     distributor: str = Field(default='', max_length=120)
     distributor_invoice: str = Field(default='', max_length=200)
+    billing_type: Literal[BILLING_TYPES] = 'Azure usage'
     revision: int = Field(default=1, ge=1)
 
 
@@ -123,7 +127,7 @@ async def create_entry(workload_id: str, body: EntryInput, user=Depends(require_
     if await ledger.one(db, 'SELECT id FROM billing_ledger WHERE owner_id=? AND workload_id=? AND period=?', (owner, workload_id, body.period)):
         raise HTTPException(409, 'This workload already has an entry for that month. Edit or restore it instead.')
     key = str(uuid.uuid4())
-    await db.execute(f'INSERT INTO billing_ledger(id,owner_id,customer_id,workload_id,{",".join(ledger.ENTRY_FIELDS)},distributor,distributor_invoice,updated_by) VALUES({",".join("?" for _ in range(17))})', (key, owner, work['customer_id'], workload_id, *values(body, ledger.ENTRY_FIELDS), body.distributor.strip(), body.distributor_invoice.strip(), user['user_id']))
+    await db.execute(f'INSERT INTO billing_ledger(id,owner_id,customer_id,workload_id,{",".join(ledger.ENTRY_FIELDS)},distributor,distributor_invoice,billing_type,updated_by) VALUES({",".join("?" for _ in range(18))})', (key, owner, work['customer_id'], workload_id, *values(body, ledger.ENTRY_FIELDS), body.distributor.strip(), body.distributor_invoice.strip(), body.billing_type, user['user_id']))
     await ledger.audit(db, owner, user['user_id'], 'entry', key, 'create', {}, body.model_dump(mode='json'))
     await db.commit()
     return await ledger.get_entity(db, owner, 'entry', key)
@@ -139,7 +143,7 @@ async def update_entry(entry_id: str, body: EntryInput, user=Depends(require_wor
     other = await ledger.one(db, 'SELECT id FROM billing_ledger WHERE owner_id=? AND workload_id=? AND period=? AND id<>?', (owner, before['workload_id'], body.period, entry_id))
     if other:
         raise HTTPException(409, 'That month already exists for this workload.')
-    cursor = await db.execute(f'UPDATE billing_ledger SET {",".join(field+"=?" for field in ledger.ENTRY_FIELDS)},distributor=?,distributor_invoice=?,updated_by=?,updated_at=CURRENT_TIMESTAMP,revision=revision+1 WHERE id=? AND owner_id=? AND revision=?', (*values(body, ledger.ENTRY_FIELDS), body.distributor.strip(), body.distributor_invoice.strip(), user['user_id'], entry_id, owner, body.revision))
+    cursor = await db.execute(f'UPDATE billing_ledger SET {",".join(field+"=?" for field in ledger.ENTRY_FIELDS)},distributor=?,distributor_invoice=?,billing_type=?,updated_by=?,updated_at=CURRENT_TIMESTAMP,revision=revision+1 WHERE id=? AND owner_id=? AND revision=?', (*values(body, ledger.ENTRY_FIELDS), body.distributor.strip(), body.distributor_invoice.strip(), body.billing_type, user['user_id'], entry_id, owner, body.revision))
     if cursor.rowcount != 1:
         raise HTTPException(409, 'Entry changed elsewhere. Reload before saving to avoid losing another edit.')
     await ledger.audit(db, owner, user['user_id'], 'entry', entry_id, 'update', before, body.model_dump(mode='json'))
@@ -240,7 +244,7 @@ async def export_ledger_csv(customer_id: str = '', user=Depends(get_current_user
     owner = user['account_id']
     where, args = ('AND l.customer_id=?', (owner, customer_id)) if customer_id else ('', (owner,))
     async with db.execute(
-        "SELECT l.period, c.name, w.name, l.invoice_number, l.customer_amount, l.distributor, l.distributor_invoice, l.distributor_amount, l.currency, l.amount_basis "
+        "SELECT l.period, c.name, w.name || ' (' || l.billing_type || ')', l.invoice_number, l.customer_amount, l.distributor, l.distributor_invoice, l.distributor_amount, l.currency, l.amount_basis "
         "FROM billing_ledger l JOIN billing_customers c ON c.id=l.customer_id JOIN billing_workloads w ON w.id=l.workload_id "
         f"WHERE l.owner_id=? {where} AND NOT EXISTS (SELECT 1 FROM billing_archives a WHERE a.owner_id=l.owner_id AND a.entity_type='entry' AND a.entity_id=l.id)", args,
     ) as cursor:
@@ -354,7 +358,7 @@ async def history(kind: Literal['customer', 'workload', 'entry'], entity_id: str
         return {'items': [dict(row) for row in await cursor.fetchall()]}
 
 
-EXTRA_TYPES = ('Implementation', 'Migration', 'Consulting', 'Support', 'Licence', 'Training', 'Other')
+EXTRA_TYPES = ('Implementation', 'Migration', 'Consulting', 'Support', 'Licence', 'Training', 'Bandwidth', 'Other')
 
 
 class ExtraChargeInput(BaseModel):

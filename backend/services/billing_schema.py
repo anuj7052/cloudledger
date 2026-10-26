@@ -111,7 +111,7 @@ INDEXES = [
 
 # Columns added after the first release, applied to databases that already exist.
 MIGRATIONS = {
-    "billing_ledger": {"distributor": "TEXT NOT NULL DEFAULT ''", "distributor_invoice": "TEXT NOT NULL DEFAULT ''"},
+    "billing_ledger": {"distributor": "TEXT NOT NULL DEFAULT ''", "distributor_invoice": "TEXT NOT NULL DEFAULT ''", "billing_type": "TEXT NOT NULL DEFAULT 'Azure usage'"},
     "billing_workloads": {"owner": "TEXT NOT NULL DEFAULT ''"},
     "billing_extra_charges": {"distributor": "TEXT NOT NULL DEFAULT ''", "distributor_amount": "TEXT", "distributor_invoice": "TEXT NOT NULL DEFAULT ''"},
 }

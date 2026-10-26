@@ -226,5 +226,5 @@ async def test_ledger_export_has_distributor_invoice_and_negative_loss(db):
     await routes.create_entry(w['id'], routes.EntryInput(period='2026-05', currency='INR', invoice_number='C-1', customer_amount='100', distributor='Redington', distributor_invoice='R-9', distributor_amount='150'), user, db)
     await routes.create_extra_charge(c['id'], routes.ExtraChargeInput(period='2026-05', charge_type='Other', description='Bandwidth', amount='50'), user, db)
     body = (await routes.export_ledger_csv('', user, db)).body.decode()
-    assert 'Distributor invoice' in body and '2026-05,Export Co,Plan,C-1,100.00,Redington,R-9,150.00,-50.00' in body
+    assert 'Distributor invoice' in body and '2026-05,Export Co,Plan (Azure usage),C-1,100.00,Redington,R-9,150.00,-50.00' in body
     assert 'Extra: Other - Bandwidth' in body
