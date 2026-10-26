@@ -108,6 +108,14 @@ async def remove_link(tenant_id: str = Query(...), subscription_id: str = Query(
     return {'deleted': True}
 
 
+@router.get('/customers/{customer_id}/azure-links')
+async def links_for_customer(customer_id: str, user=Depends(get_current_user), db=Depends(get_db)):
+    owner = user['account_id']
+    await ledger.get_entity(db, owner, 'customer', customer_id)
+    items = await rows(db, "SELECT l.tenant_id,l.subscription_id,l.azure_name,l.workload_id,l.method,l.score,w.name AS workload FROM billing_azure_links l LEFT JOIN billing_workloads w ON w.id=l.workload_id WHERE l.owner_id=? AND l.customer_id=? ORDER BY l.azure_name", (owner, customer_id))
+    return {'items': items}
+
+
 @router.get('/azure-links/services')
 async def services_for_azure(tenant_id: str = Query(...), subscription_ids: list[str] = Query(default=[]), user=Depends(get_current_user), db=Depends(get_db)):
     """PO/BOQ services available to explain notes for these Azure subscriptions (all mapped ones when none given)."""

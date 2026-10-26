@@ -295,6 +295,7 @@ function AppShell() {
             <Route path="/boq" element={<Boq />} />
             <Route path="/azure-billing" element={<AzureBilling />} />
             <Route path="/azure-billing/settings" element={<AzureBilling />} />
+            <Route path="/azure-billing/mapping" element={<AzureBilling />} />
             <Route path="/azure-billing/dashboard" element={<BillingDashboard />} />
             <Route path="/azure-billing/entries" element={<BillingEntries />} />
             {/* Commitments was removed; old links land on the Cost dashboard. */}

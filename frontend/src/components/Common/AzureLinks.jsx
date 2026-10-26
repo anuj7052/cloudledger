@@ -4,6 +4,7 @@ import { CheckCircle2, Link2, Loader2, Sparkles, Unlink } from 'lucide-react';
 import * as api from '../../api/client';
 import { errorMessage } from '../../utils/apiError';
 import { useAppStore } from '../../store/useAppStore';
+import { tenantText } from '../../utils/identity';
 
 /*
  * Maps each Azure subscription in the signed-in tenant to a billing customer
@@ -16,6 +17,7 @@ const sel = 'h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 tex
 export default function AzureLinks({ canEdit }) {
   const tenantId = useAppStore(s => s.selectedTenantId);
   const tenants = useAppStore(s => s.tenants);
+  const setSelectedTenant = useAppStore(s => s.setSelectedTenant);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [draft, setDraft] = useState({});
@@ -30,10 +32,11 @@ export default function AzureLinks({ canEdit }) {
     } catch (e) { setError(errorMessage(e)); setData({ items: [], customers: [], workloads: [] }); }
   };
   useEffect(() => { if (tenantId) load(); }, [tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!tenantId && (tenants || []).length) return <label className="block max-w-sm text-sm text-slate-400">Choose the tenant to map<select className={`${sel} mt-1`} value="" onChange={e => setSelectedTenant(e.target.value)}><option value="">Choose…</option>{tenants.map(t => <option key={t.tenant_id} value={t.tenant_id}>{tenantText(t.tenant_name)}</option>)}</select></label>;
   if (!tenantId) return <p className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">Sign in to a tenant (Settings → session token) to map its Azure subscriptions.</p>;
   if (!data) return <p className="flex items-center gap-2 text-sm text-slate-400"><Loader2 size={15} className="animate-spin" />Reading Azure subscriptions and matching customers…</p>;
   const custName = id => data.customers.find(c => c.id === id)?.name || '';
-  const tenantName = tenants?.find(t => t.tenant_id === tenantId)?.tenant_name || 'this tenant';
+  const tenantName = tenantText(tenants?.find(t => t.tenant_id === tenantId)?.tenant_name);
   const save = async row => {
     const d = { customer_id: row.customer_id || row.suggested_customer_id, workload_id: row.workload_id, ...draft[row.subscription_id] };
     if (!d.customer_id) { toast.error('Choose a customer'); return; }
@@ -52,6 +55,7 @@ export default function AzureLinks({ canEdit }) {
           <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-100"><Link2 size={18} className="text-[#ea580c]" />Map Azure subscriptions to customers</h2>
           <p className="mt-1 text-sm text-slate-400">{linked} of {data.items.length} subscriptions in {tenantName} are linked. Matches are made automatically by name; change any that are wrong. Linked subscriptions show each PO/BOQ service as a highlighted note on the cost dashboard.</p>
         </div>
+        {(tenants || []).length > 1 && <label className="text-xs text-slate-400">Tenant<select className={`${sel} mt-1 min-w-56`} value={tenantId} onChange={e => { setData(null); setSelectedTenant(e.target.value); }}>{tenants.map(t => <option key={t.tenant_id} value={t.tenant_id}>{tenantText(t.tenant_name)}</option>)}</select></label>}
         <button type="button" onClick={load} className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-[#ea580c]"><Sparkles size={14} className="mr-1 inline" />Match again</button>
       </div>
       {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
@@ -77,6 +81,28 @@ export default function AzureLinks({ canEdit }) {
           })}</tbody>
         </table>
       </div>
+    </section>
+  );
+}
+
+/** Small panel on a customer page: which Azure subscriptions are linked to this customer. */
+export function CustomerAzureLinks({ customerId }) {
+  const [items, setItems] = useState(null);
+  useEffect(() => {
+    let live = true;
+    api.listCustomerAzureLinks(customerId).then(d => { if (live) setItems(d.items || []); }).catch(() => { if (live) setItems([]); });
+    return () => { live = false; };
+  }, [customerId]);
+  if (items == null) return null;
+  return (
+    <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-100"><Link2 size={15} className="text-[#ea580c]" />Linked Azure subscriptions ({items.length})</h2>
+        <a href="/azure-billing/mapping" className="text-xs font-medium text-[#c2410c] hover:underline">{items.length ? 'Change mapping' : 'Map Azure subscriptions'} →</a>
+      </div>
+      {!items.length ? <p className="mt-2 text-xs text-slate-500">No Azure subscription is linked to this customer yet. Open the mapping to link one; PO/BOQ notes then appear on the cost dashboard.</p> : (
+        <ul className="mt-3 flex flex-wrap gap-2">{items.map(l => <li key={l.tenant_id + l.subscription_id} className="rounded-lg border border-slate-800 px-3 py-1.5 text-xs"><span className="font-medium text-slate-200">{l.azure_name || 'Unnamed subscription'}</span>{l.workload && <span className="text-slate-500"> → {l.workload}</span>}<span className={`ml-2 rounded-full px-1.5 py-0.5 text-[10px] ${l.method === 'manual' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-600'}`}>{l.method === 'manual' ? 'Confirmed' : 'Auto'}</span></li>)}</ul>
+      )}
     </section>
   );
 }

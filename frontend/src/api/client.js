@@ -1252,3 +1252,4 @@ export const saveBillingAzureLink = body => api.put('/billing/azure-links', body
 export const removeBillingAzureLink = (tenantId, subscriptionId) => api.delete('/billing/azure-links', { params: { tenant_id: tenantId, subscription_id: subscriptionId } }).then(r => r.data);
 export const listBillingAzureServices = (tenantId, subscriptionIds = []) => api.get('/billing/azure-links/services', { params: { tenant_id: tenantId, subscription_ids: subscriptionIds }, paramsSerializer: { indexes: null } }).then(r => r.data);
 export const assignCostNoteService = (noteId, serviceId) => api.put(`/billing/cost-notes/${encodeURIComponent(noteId)}/service`, { service_id: serviceId }).then(r => r.data);
+export const listCustomerAzureLinks = customer => api.get(`/billing/customers/${encodeURIComponent(customer)}/azure-links`).then(r => r.data);

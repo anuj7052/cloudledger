@@ -3,7 +3,7 @@ import {
   GitCompareArrows, KeyRound, LayoutDashboard, Lightbulb, Network,
   Plug, Scale,
   ReceiptText, Search, Server, Settings, Shield, ShieldAlert, ShieldCheck, Trash2,
-  TrendingUp, UserCog, Users, Wallet,
+  TrendingUp, UserCog, Users, Wallet, Link2,
 } from 'lucide-react';
 
 /**
@@ -59,6 +59,10 @@ export const SECTIONS = [
       {
         to: '/azure-billing/entries', label: 'Add entry', icon: ReceiptText,
         blurb: 'Customer, subscription, month, invoice number, our billing and distributor amounts.',
+      },
+      {
+        to: '/azure-billing/mapping', label: 'Azure mapping', icon: Link2,
+        blurb: 'Link Azure subscriptions to billing customers so PO/BOQ notes show on the cost dashboard.',
       },
       {
         to: '/azure-billing', label: 'Customers', icon: Users, end: true,

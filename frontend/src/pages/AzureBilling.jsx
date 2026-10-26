@@ -6,7 +6,7 @@ import { errorMessage } from '../utils/apiError';
 import { billingMoney, billingMonth, documentStatus } from '../utils/billingPresentation';
 import BillingLedger, { LedgerImport } from '../components/Common/BillingLedger';
 import BillingServices from '../components/Common/BillingServices';
-import AzureLinks from '../components/Common/AzureLinks';
+import AzureLinks, { CustomerAzureLinks } from '../components/Common/AzureLinks';
 import { BillingPage, BillingNotice, BillingEmpty, billingInput as input, billingButton as primary, billingSecondary as secondary, billingPanel as panel } from '../components/billing-ui/workspace';
 
 const TYPES = { customer: 'Customer invoice', distributor: 'Distributor invoice', azure_usage: 'Azure usage bill' };
@@ -94,6 +94,7 @@ function CustomerProfile({ customer, settings, onCustomerChanged }) {
   return <BillingPage title={customer.name} description={customer.contact_email || 'Monthly billing, invoices and company details.'} actions={<><Link className={secondary} to="/azure-billing"><ArrowLeft size={15} />All customers</Link><button className={secondary} disabled={busy} onClick={() => run(async () => saveFile(await api.exportBillingWorkbook(customer.id), 'billing-report.xlsx'))}><Download size={15} />Export report</button>{canEdit && <button className={primary} onClick={() => { setView('bills'); setUploading(true); }}><Plus size={16} />Upload bill</button>}</>}>
     {!!customer.archived && <BillingNotice>This customer is archived. Restore it in Company details to make changes.</BillingNotice>}
     {error && <BillingNotice error>{error}</BillingNotice>}{message && <BillingNotice>{message}</BillingNotice>}
+    <CustomerAzureLinks customerId={customer.id} />
     <nav aria-label="Customer sections" className="flex flex-wrap gap-2">{[['monthly', 'Monthly billing'], ['services', 'Services & POs'], ['bills', `Bills & uploads${pending ? ` (${pending} to check)` : ''}`], ['details', 'Company details']].map(([key, label]) => <button key={key} aria-pressed={view === key} onClick={() => setView(key)} className={view === key ? primary : secondary}>{label}</button>)}</nav>
     {view === 'monthly' && <BillingLedger customerId={customer.id} canEdit={canEdit} initialReview={params.get('review') === '1'} initialMonth={params.get('month') || ''} />}
     {view === 'services' && <BillingServices customerId={customer.id} canEdit={canEdit} />}
@@ -136,9 +137,9 @@ export default function AzureBilling() {
     if (typed.trim().toUpperCase() !== 'DELETE') { setError('You did not type DELETE, so nothing was deleted.'); return; }
     run(async () => { const r = await api.deleteBillingItem('customer', item.id, 'DELETE'); await load(); setError(''); window.alert(`Deleted ${item.name} (${r.subscriptions} subscriptions, ${r.entries} monthly entries).`); });
   };
-  if (params.get('map') === '1') return <BillingPage title="Azure mapping" description="Link Azure subscriptions to billing customers." actions={<Link className={secondary} to="/azure-billing"><ArrowLeft size={15} />All customers</Link>}><AzureLinks canEdit={!!settings.can_edit} /></BillingPage>;
+  if (params.get('map') === '1' || location.pathname.endsWith('/mapping')) return <BillingPage title="Azure mapping" description="Link Azure subscriptions to billing customers." actions={<Link className={secondary} to="/azure-billing"><ArrowLeft size={15} />All customers</Link>}><AzureLinks canEdit={!!settings.can_edit} /></BillingPage>;
   const shown = customers.filter(item => (showArchived ? !!item.archived : !item.archived) && `${item.name} ${item.company} ${item.contact_email}`.toLowerCase().includes(search.trim().toLowerCase()));
-  return <BillingPage title="Customers" description="Choose a company to see its monthly billing or add a new bill." actions={settings.can_edit && <><Link className={secondary} to="/azure-billing?map=1"><Link2 size={16} />Map Azure subscriptions</Link><button className={secondary} onClick={() => setImporting(v => !v)}><Upload size={16} />Import spreadsheet</button><button className={primary} onClick={() => setAdding(v => !v)}><Plus size={16} />Add customer</button></>}>
+  return <BillingPage title="Customers" description="Choose a company to see its monthly billing or add a new bill." actions={settings.can_edit && <><Link className={secondary} to="/azure-billing/mapping"><Link2 size={16} />Map Azure subscriptions</Link><button className={secondary} onClick={() => setImporting(v => !v)}><Upload size={16} />Import spreadsheet</button><button className={primary} onClick={() => setAdding(v => !v)}><Plus size={16} />Add customer</button></>}>
     {error && <BillingNotice error>{error}</BillingNotice>}{id && !customer && <BillingNotice error>That customer could not be found in this workspace.</BillingNotice>}
     {adding && settings.can_edit && <section className={panel}><h2 className="mb-5 text-lg font-semibold">New customer</h2><CompanyForm busy={busy} onCancel={() => setAdding(false)} onSave={async form => run(async () => { const created = await api.createBillingCustomer(form); await load(); setParams({ customer: created.id }); setAdding(false); })} /></section>}
     {importing && settings.can_edit && <LedgerImport onImported={load} />}
