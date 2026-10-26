@@ -36,3 +36,15 @@ async def test_auto_map_writes_po_notes_and_manual_fix(db):  # noqa: F811
     await services.delete_service(svc['id'], ADMIN, db)
     async with db.execute("SELECT COUNT(*) FROM cost_notes WHERE source='billing'") as c:
         assert (await c.fetchone())[0] == 0
+
+
+def test_subscription_chosen_by_distinguishing_word():
+    from services.billing_links import best_match
+    customers = [{'id': 'm', 'name': 'Millennium Semiconductors India Pvt.Ltd'}, {'id': 'z', 'name': 'Zricks.com Pvt Ltd'}]
+    workloads = [{'id': 'it', 'customer_id': 'm', 'name': 'Azure Subscription - IT Subscription'},
+                 {'id': 'ai', 'customer_id': 'm', 'name': 'Azure Subscription - AI Subscription'},
+                 {'id': 'sap', 'customer_id': 'm', 'name': 'Azure Subscription - SAP Subscription'}]
+    for azure, want in [('Millennium Semiconductors - IT Subscription', 'it'), ('Millennium Semiconductors - AI Subscription', 'ai'), ('Millennium Semiconductors - SAP Subscription', 'sap')]:
+        got = best_match(azure, customers, workloads)
+        assert got['customer_id'] == 'm' and got['workload_id'] == want, (azure, got)
+    assert best_match('Millennium Semiconductors - Dev', customers, workloads)['workload_id'] == ''

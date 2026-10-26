@@ -55,6 +55,12 @@ async def suggest(body: SuggestInput, user=Depends(get_current_user), db=Depends
     for sub in body.subscriptions:
         link = saved.get(sub.id)
         guess = best_match(sub.name, customers, workloads)
+        if link and link['method'] == 'auto' and can_save and (link['customer_id'], link['workload_id']) != (guess['customer_id'], guess['workload_id']):
+            # Unconfirmed automatic matches are re-checked every time; confirmed ones never change.
+            await db.execute('DELETE FROM billing_azure_links WHERE owner_id=? AND tenant_id=? AND subscription_id=?', (owner, body.tenant_id, sub.id))
+            for service in await rows(db, 'SELECT * FROM billing_services WHERE owner_id=? AND workload_id=?', (owner, link['workload_id'])):
+                await sync_service_notes(db, owner, service, user)
+            link = None
         if not link and can_save and guess['score'] >= AUTO_THRESHOLD:
             await db.execute('INSERT INTO billing_azure_links(owner_id,tenant_id,subscription_id,azure_name,customer_id,workload_id,method,score,updated_by) VALUES(?,?,?,?,?,?,?,?,?)',
                              (owner, body.tenant_id, sub.id, sub.name, guess['customer_id'], guess['workload_id'], 'auto', guess['score'], user['user_id']))
