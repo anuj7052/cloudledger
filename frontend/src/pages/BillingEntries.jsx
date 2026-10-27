@@ -4,9 +4,10 @@ import toast from 'react-hot-toast';
 import { Check, Download, FileUp, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import {
   bulkImportBillingCustomers, createBillingCustomer, exportBillingEntriesCsv, deleteBillingItem, getBillingLedger, listBillingCustomers, listBillingDistributors,
-  saveBillingEntry, saveBillingWorkload, updateBillingCustomer, listBillingExtraCharges, createBillingExtraCharge, deleteBillingExtraCharge,
+  saveBillingEntry, saveBillingWorkload, updateBillingCustomer, listBillingExtraCharges, createBillingExtraCharge, listCombinedBills, deleteCombinedBill, deleteBillingExtraCharge,
 } from '../api/client';
 import { errorMessage } from '../utils/apiError';
+import CombinedBillForm from '../components/Common/CombinedBillForm';
 import { useCanAdminister } from '../hooks/useCanAdminister';
 import { BillingPage } from '../components/billing-ui/workspace';
 import { Card, CardContent } from '../components/billing-ui/card';
@@ -41,6 +42,7 @@ function AddInline({ placeholder, onAdd, busy, onCancel, initial = '', label = '
   );
 }
 
+const TENANT = '__tenant__';
 const BILLING_TYPES = ['Azure usage', 'Monthly RI', 'One-time RI', 'Savings plan', 'Licence / subscription', 'Marketplace', 'Other'];
 const EXTRA_KINDS = ['Implementation', 'Migration', 'Consulting', 'Support', 'Licence', 'Training', 'Bandwidth', 'Other'];
 const EMPTY = { is_extra: false, billing_type: 'Azure usage', charge_type: 'Implementation', description: '', period: thisMonth(), invoice_number: '', customer_amount: '', distributor: '', distributor_invoice: '', distributor_amount: '', received_amount: '', received_on: '', payment_status: '', currency: 'INR', amount_basis: 'net' };
@@ -103,6 +105,14 @@ export default function BillingEntries() {
 
   const subscriptions = useMemo(() => (ledger?.workloads || []).filter(w => !w.archived), [ledger]);
   const [extras, setExtras] = useState(null);
+  const [bills, setBills] = useState(null);
+  const [editingBill, setEditingBill] = useState(null);
+  useEffect(() => {
+    if (!customerId) return undefined;
+    let live = true;
+    listCombinedBills(customerId).then(d => { if (live) setBills(d.items || []); }).catch(() => { if (live) setBills([]); });
+    return () => { live = false; };
+  }, [customerId]);
   useEffect(() => {
     if (!customerId) return undefined;
     let live = true;
@@ -239,8 +249,9 @@ export default function BillingEntries() {
 
   const subName = id => subscriptions.find(w => w.id === id)?.name || (ledger?.workloads || []).find(w => w.id === id)?.name || '—';
   const extraRows = (extras || []).map(x => ({ ...x, _extra: true }));
-  const rows = [...entries, ...extraRows].sort((a, b) => b.period.localeCompare(a.period) || Number(Boolean(a._extra)) - Number(Boolean(b._extra)));
-  const totals = rows.reduce((t, e) => ({ billed: t.billed + (Number(e._extra ? e.amount : e.customer_amount) || 0), cost: t.cost + (Number(e.distributor_amount) || 0) }), { billed: 0, cost: 0 });
+  const billRows = (bills || []).map(b => ({ ...b, _bill: true, amount: b.lines.reduce((t, l) => t + Number(l.amount), 0), distributor_amount: b.lines.some(l => l.distributor_amount != null) ? b.lines.reduce((t, l) => t + Number(l.distributor_amount || 0), 0) : null }));
+  const rows = [...entries, ...extraRows, ...billRows].sort((a, b) => b.period.localeCompare(a.period) || Number(Boolean(a._extra)) - Number(Boolean(b._extra)));
+  const totals = rows.reduce((t, e) => ({ billed: t.billed + (Number(e._extra || e._bill ? e.amount : e.customer_amount) || 0), cost: t.cost + (Number(e.distributor_amount) || 0) }), { billed: 0, cost: 0 });
   const currency = entries[0]?.currency || form.currency;
 
   return (
@@ -274,12 +285,14 @@ export default function BillingEntries() {
                 <NativeSelect id="be-sub" className="mt-1.5" value={workloadId} onChange={e => setWorkloadId(e.target.value)} disabled={!customerId || !ledger}>
                   <option value="">{!customerId ? 'Choose a customer first' : !ledger ? 'Loading…' : subscriptions.length ? 'Choose a subscription' : 'No subscriptions yet — add one'}</option>
                   {subscriptions.map(w => <option key={w.id} value={w.id}>{w.name}{w.owner ? ` · ${w.owner}` : ''}</option>)}
+                  {subscriptions.length > 0 && <option value={TENANT}>★ Whole tenant — one bill (split by type / subscription)</option>}
                 </NativeSelect>
-                {canEdit && workloadId && !adding && <div className="mt-1.5 flex gap-4"><button type="button" onClick={() => setAdding('rename-sub')} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-[#c2410c]"><Pencil className="h-3 w-3" />Rename subscription</button><button type="button" onClick={removeSubscription} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-red-400"><Trash2 className="h-3 w-3" />Delete this subscription</button></div>}
+                {canEdit && workloadId && workloadId !== TENANT && !adding && <div className="mt-1.5 flex gap-4"><button type="button" onClick={() => setAdding('rename-sub')} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-[#c2410c]"><Pencil className="h-3 w-3" />Rename subscription</button><button type="button" onClick={removeSubscription} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-red-400"><Trash2 className="h-3 w-3" />Delete this subscription</button></div>}
                 {adding === 'rename-sub' && <AddInline placeholder="New subscription name" label="Save" initial={subscriptions.find(w => w.id === workloadId)?.name || ''} busy={busy} onAdd={renameSubscription} onCancel={() => setAdding('')} />}
                 {adding === 'sub' && <AddInline placeholder="Subscription name" busy={busy} onAdd={addSubscription} onCancel={() => setAdding('')} />}
               </div>
 
+              {workloadId === TENANT ? <CombinedBillForm key={editingBill?.id || 'new'} customerId={customerId} subscriptions={subscriptions} distributors={distributors} existing={editingBill} period={form.period} monthHasEntries={entries.some(e => e.period === (editingBill?.period || form.period))} onCancel={editingBill ? () => setEditingBill(null) : undefined} onSaved={saved => { setBills(list => [saved, ...(list || []).filter(b => b.id !== saved.id)]); setEditingBill(null); }} /> : <>
               {customerId && <div className="rounded-lg border border-slate-800 p-3">
                 <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-200"><input type="checkbox" className="h-4 w-4 accent-[#ea580c]" checked={form.is_extra} onChange={e => set({ is_extra: e.target.checked })} />This is an extra charge <span className="font-normal text-slate-500">(implementation, migration, bandwidth…)</span></label>
                 {form.is_extra && <div className="mt-3 grid grid-cols-2 gap-3">
@@ -343,6 +356,7 @@ export default function BillingEntries() {
                 {busy ? <Loader2 className="animate-spin" /> : <Check />}{form.is_extra ? 'Save extra charge' : existing ? 'Update entry' : 'Save entry'}
               </Button>
               {!canEdit && <p className="text-center text-xs text-slate-500">Workspace admins only</p>}
+              </>}
             </form>
           </CardContent>
         </Card>
@@ -362,7 +376,21 @@ export default function BillingEntries() {
                   {['Month', 'Subscription', 'Invoice', 'Our billing', 'Distributor', 'Distributor invoice', 'Distributor amount', 'Profit / loss', 'Received', 'Payment remark', ''].map(h => <th key={h} className={`px-4 py-2.5 font-medium ${['Our billing', 'Distributor amount', 'Profit / loss', 'Received'].includes(h) ? 'text-right' : ''}`}>{h}</th>)}
                 </tr></thead>
                 <tbody>
-                  {rows.map(e => e._extra ? (
+                  {rows.map(e => e._bill ? (
+                    <tr key={`b-${e.id}`} onClick={() => { setWorkloadId(TENANT); setEditingBill(e); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="cursor-pointer border-b border-slate-800/60 bg-[#fff7ed]/60 hover:bg-[#ffedd5]/60">
+                      <td className="whitespace-nowrap px-4 py-2.5 text-slate-200">{monthName(e.period)}</td>
+                      <td className="max-w-[16rem] px-4 py-2.5 text-slate-300"><span className="mr-1.5 rounded-full bg-[#ea580c] px-2 py-0.5 text-[10px] font-semibold text-[#ffffff]">Tenant bill</span><span className="text-xs">{e.lines.map(l => l.type).join(' · ')}</span></td>
+                      <td className="px-4 py-2.5 text-slate-400">{e.invoice_number || '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-100">{money(e.amount, e.currency)}</td>
+                      <td className="px-4 py-2.5 text-slate-300">{e.distributor || '—'}</td>
+                      <td className="px-4 py-2.5 text-slate-400">{e.distributor_invoice || '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-100">{e.distributor_amount != null ? money(e.distributor_amount, e.currency) : '—'}</td>
+                      <td className={`whitespace-nowrap px-4 py-2.5 text-right font-semibold tabular-nums ${e.distributor_amount == null ? 'text-slate-500' : e.amount - e.distributor_amount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{e.distributor_amount == null ? '—' : money(e.amount - e.distributor_amount, e.currency)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">{e.received_amount != null ? money(e.received_amount, e.currency) : '—'}</td>
+                      <td className="max-w-[14rem] truncate px-4 py-2.5 text-xs text-slate-400" title={e.payment_status}>{e.payment_status || '—'}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right"><Pencil className="inline h-3.5 w-3.5 text-slate-500" aria-label="Edit" />{canEdit && <button type="button" aria-label="Delete tenant bill" onClick={async ev => { ev.stopPropagation(); if (!window.confirm(`Delete the tenant bill for ${monthName(e.period)}?`)) return; try { await deleteCombinedBill(e.id); setBills(list => list.filter(b => b.id !== e.id)); toast.success('Tenant bill deleted'); } catch (err) { toast.error(errorMessage(err)); } }} className="ml-2 rounded p-1 text-slate-500 hover:bg-red-500/10 hover:text-red-400"><Trash2 className="inline h-3.5 w-3.5" /></button>}</td>
+                    </tr>
+                  ) : e._extra ? (
                     <tr key={`x-${e.id}`} className="border-b border-slate-800/60 bg-emerald-500/5">
                       <td className="whitespace-nowrap px-4 py-2.5 text-slate-200">{monthName(e.period)}</td>
                       <td className="max-w-[12rem] truncate px-4 py-2.5 text-slate-300" title={e.description}><span className="mr-1.5 rounded-full bg-[#ffedd5] px-2 py-0.5 text-[11px] font-medium text-[#9a3412]">Extra · {e.charge_type}</span>{e.description}</td>

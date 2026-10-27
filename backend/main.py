@@ -44,7 +44,7 @@ from routers import (
     admin, tenants, subscriptions, costs, services, upload, bandwidth, boq,
     guide, integrations, orphaned, scans, changes, activity, prices, security,
     compute, anomalies, team, provision, actions, network,
-    timeline, billing, billing_ledger, billing_services, billing_links, cost_notes,
+    timeline, billing, billing_ledger, billing_services, billing_links, billing_combined, cost_notes,
 )
 
 log = logging.getLogger("app")
@@ -54,6 +54,7 @@ API_ROUTERS = [
     billing_ledger.router,
     billing_services.router,
     billing_links.router,
+    billing_combined.router,
     cost_notes.router,
     tenants.router,
     subscriptions.router,

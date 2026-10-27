@@ -166,4 +166,13 @@ async def load(db, owner, start, end, currency='', source='ledger', customer_id=
     if source == 'ledger':
         async with db.execute("SELECT customer_id,period,amount,currency,amount_basis,distributor,distributor_amount FROM billing_extra_charges WHERE owner_id=? AND period>=? AND period<=?", (owner, first, last)) as cursor:
             extras = [dict(r) for r in await cursor.fetchall() if r['customer_id'] in {c['id'] for c in customers}]
+        # Whole-customer (tenant) bills: each line counts like a one-off charge.
+        import json as _json
+        async with db.execute("SELECT customer_id,period,currency,amount_basis,distributor,lines FROM billing_combined_bills WHERE owner_id=? AND period>=? AND period<=?", (owner, first, last)) as cursor:
+            for r in await cursor.fetchall():
+                if r['customer_id'] not in {c['id'] for c in customers}:
+                    continue
+                for line in _json.loads(r['lines'] or '[]'):
+                    extras.append({'customer_id': r['customer_id'], 'period': r['period'], 'amount': line['amount'], 'currency': r['currency'],
+                                   'amount_basis': r['amount_basis'], 'distributor': r['distributor'], 'distributor_amount': line.get('distributor_amount')})
     return aggregate(customers, workloads, records, start, end, currency, source, extras)

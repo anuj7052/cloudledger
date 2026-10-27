@@ -98,6 +98,15 @@ SCHEMAS = {
         updated_by TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
         PRIMARY KEY(owner_id, tenant_id, subscription_id)
     )""",
+    "billing_combined_bills": """CREATE TABLE IF NOT EXISTS billing_combined_bills (
+        id TEXT PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id),
+        customer_id TEXT NOT NULL REFERENCES billing_customers(id),
+        period TEXT NOT NULL, invoice_number TEXT NOT NULL DEFAULT '',
+        distributor TEXT NOT NULL DEFAULT '', distributor_invoice TEXT NOT NULL DEFAULT '',
+        currency TEXT NOT NULL DEFAULT 'INR', amount_basis TEXT NOT NULL DEFAULT 'gross',
+        lines TEXT NOT NULL DEFAULT '[]', received_amount TEXT, payment_status TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+    )""",
     "billing_changes": """CREATE TABLE IF NOT EXISTS billing_changes (
         id TEXT PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id), entity_type TEXT NOT NULL,
         entity_id TEXT NOT NULL, action TEXT NOT NULL, before_json TEXT NOT NULL, after_json TEXT NOT NULL,

@@ -327,6 +327,7 @@ async def delete_permanently(kind: Literal['customer', 'workload', 'entry'], ent
         async with db.execute('SELECT id FROM billing_workloads WHERE owner_id=? AND customer_id=?', (owner, entity_id)) as cursor:
             workload_ids = [row[0] for row in await cursor.fetchall()]
         await db.execute('DELETE FROM billing_extra_charges WHERE owner_id=? AND customer_id=?', (owner, entity_id))
+        await db.execute('DELETE FROM billing_combined_bills WHERE owner_id=? AND customer_id=?', (owner, entity_id))
         if await ledger.one(db, 'SELECT id FROM billing_service_files WHERE owner_id=? AND customer_id=?', (owner, entity_id)):
             raise HTTPException(409, 'This customer has service documents. Delete them in Services & POs first, or archive the customer.')
         await db.execute('DELETE FROM billing_service_notes WHERE owner_id=? AND service_id IN (SELECT id FROM billing_services WHERE owner_id=? AND customer_id=?)', (owner, owner, entity_id))

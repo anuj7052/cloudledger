@@ -1253,3 +1253,7 @@ export const removeBillingAzureLink = (tenantId, subscriptionId) => api.delete('
 export const listBillingAzureServices = (tenantId, subscriptionIds = []) => api.get('/billing/azure-links/services', { params: { tenant_id: tenantId, subscription_ids: subscriptionIds }, paramsSerializer: { indexes: null } }).then(r => r.data);
 export const assignCostNoteService = (noteId, serviceId) => api.put(`/billing/cost-notes/${encodeURIComponent(noteId)}/service`, { service_id: serviceId }).then(r => r.data);
 export const listCustomerAzureLinks = customer => api.get(`/billing/customers/${encodeURIComponent(customer)}/azure-links`).then(r => r.data);
+export const listCombinedBills = customer => api.get(`/billing/customers/${encodeURIComponent(customer)}/combined-bills`).then(r => r.data);
+export const createCombinedBill = (customer, body) => api.post(`/billing/customers/${encodeURIComponent(customer)}/combined-bills`, body).then(r => r.data);
+export const updateCombinedBill = (id, body) => api.put(`/billing/combined-bills/${encodeURIComponent(id)}`, body).then(r => r.data);
+export const deleteCombinedBill = id => api.delete(`/billing/combined-bills/${encodeURIComponent(id)}`).then(r => r.data);
