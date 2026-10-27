@@ -48,7 +48,13 @@ class EntryInput(BaseModel):
     distributor: str = Field(default='', max_length=120)
     distributor_invoice: str = Field(default='', max_length=200)
     billing_type: Literal[BILLING_TYPES] = 'Azure usage'
+    received_amount: Decimal | None = Field(default=None, ge=0, max_digits=18, decimal_places=4, allow_inf_nan=False)
+    received_on: str = Field(default='', pattern=r'^(\d{4}-\d{2}-\d{2})?$')
     revision: int = Field(default=1, ge=1)
+
+
+def money_text(value):
+    return None if value is None else str(value)
 
 
 def values(body, fields):
@@ -109,6 +115,8 @@ async def update_workload(workload_id: str, body: WorkloadInput, user=Depends(re
     await active_customer(db, owner, before['customer_id'])
     if await ledger.is_archived(db, owner, 'workload', workload_id):
         raise HTTPException(409, 'Restore this workload before editing.')
+    if 'owner' not in body.model_fields_set:
+        body = body.model_copy(update={'owner': before.get('owner') or ''})
     cursor = await db.execute(f'UPDATE billing_workloads SET {",".join(field+"=?" for field in ledger.WORKLOAD_FIELDS)},owner=?,revision=revision+1 WHERE id=? AND owner_id=? AND revision=?', (*values(body, ledger.WORKLOAD_FIELDS), body.owner.strip(), workload_id, owner, body.revision))
     if cursor.rowcount != 1:
         raise HTTPException(409, 'Workload changed elsewhere. Reload before saving.')
@@ -127,7 +135,7 @@ async def create_entry(workload_id: str, body: EntryInput, user=Depends(require_
     if await ledger.one(db, 'SELECT id FROM billing_ledger WHERE owner_id=? AND workload_id=? AND period=?', (owner, workload_id, body.period)):
         raise HTTPException(409, 'This workload already has an entry for that month. Edit or restore it instead.')
     key = str(uuid.uuid4())
-    await db.execute(f'INSERT INTO billing_ledger(id,owner_id,customer_id,workload_id,{",".join(ledger.ENTRY_FIELDS)},distributor,distributor_invoice,billing_type,updated_by) VALUES({",".join("?" for _ in range(18))})', (key, owner, work['customer_id'], workload_id, *values(body, ledger.ENTRY_FIELDS), body.distributor.strip(), body.distributor_invoice.strip(), body.billing_type, user['user_id']))
+    await db.execute(f'INSERT INTO billing_ledger(id,owner_id,customer_id,workload_id,{",".join(ledger.ENTRY_FIELDS)},distributor,distributor_invoice,billing_type,received_amount,received_on,updated_by) VALUES({",".join("?" for _ in range(20))})', (key, owner, work['customer_id'], workload_id, *values(body, ledger.ENTRY_FIELDS), body.distributor.strip(), body.distributor_invoice.strip(), body.billing_type, money_text(body.received_amount), body.received_on, user['user_id']))
     await ledger.audit(db, owner, user['user_id'], 'entry', key, 'create', {}, body.model_dump(mode='json'))
     await db.commit()
     return await ledger.get_entity(db, owner, 'entry', key)
@@ -143,7 +151,12 @@ async def update_entry(entry_id: str, body: EntryInput, user=Depends(require_wor
     other = await ledger.one(db, 'SELECT id FROM billing_ledger WHERE owner_id=? AND workload_id=? AND period=? AND id<>?', (owner, before['workload_id'], body.period, entry_id))
     if other:
         raise HTTPException(409, 'That month already exists for this workload.')
-    cursor = await db.execute(f'UPDATE billing_ledger SET {",".join(field+"=?" for field in ledger.ENTRY_FIELDS)},distributor=?,distributor_invoice=?,billing_type=?,updated_by=?,updated_at=CURRENT_TIMESTAMP,revision=revision+1 WHERE id=? AND owner_id=? AND revision=?', (*values(body, ledger.ENTRY_FIELDS), body.distributor.strip(), body.distributor_invoice.strip(), body.billing_type, user['user_id'], entry_id, owner, body.revision))
+    # Older screens send only some fields. Anything the caller did not send keeps
+    # its stored value instead of silently resetting to the default.
+    sent = body.model_fields_set
+    keep = {f: before.get(f) for f in (*ledger.ENTRY_FIELDS, 'distributor', 'distributor_invoice', 'billing_type', 'received_amount', 'received_on') if f not in sent}
+    body = body.model_copy(update={k: v for k, v in keep.items() if v is not None and k in EntryInput.model_fields})
+    cursor = await db.execute(f'UPDATE billing_ledger SET {",".join(field+"=?" for field in ledger.ENTRY_FIELDS)},distributor=?,distributor_invoice=?,billing_type=?,received_amount=?,received_on=?,updated_by=?,updated_at=CURRENT_TIMESTAMP,revision=revision+1 WHERE id=? AND owner_id=? AND revision=?', (*values(body, ledger.ENTRY_FIELDS), str(body.distributor).strip(), str(body.distributor_invoice).strip(), body.billing_type, money_text(body.received_amount), body.received_on or '', user['user_id'], entry_id, owner, body.revision))
     if cursor.rowcount != 1:
         raise HTTPException(409, 'Entry changed elsewhere. Reload before saving to avoid losing another edit.')
     await ledger.audit(db, owner, user['user_id'], 'entry', entry_id, 'update', before, body.model_dump(mode='json'))
@@ -244,26 +257,27 @@ async def export_ledger_csv(customer_id: str = '', user=Depends(get_current_user
     owner = user['account_id']
     where, args = ('AND l.customer_id=?', (owner, customer_id)) if customer_id else ('', (owner,))
     async with db.execute(
-        "SELECT l.period, c.name, w.name || ' (' || l.billing_type || ')', l.invoice_number, l.customer_amount, l.distributor, l.distributor_invoice, l.distributor_amount, l.currency, l.amount_basis "
+        "SELECT l.period, c.name, w.name || ' (' || l.billing_type || ')', l.invoice_number, l.customer_amount, l.distributor, l.distributor_invoice, l.distributor_amount, l.currency, l.amount_basis, l.received_amount, l.payment_status "
         "FROM billing_ledger l JOIN billing_customers c ON c.id=l.customer_id JOIN billing_workloads w ON w.id=l.workload_id "
         f"WHERE l.owner_id=? {where} AND NOT EXISTS (SELECT 1 FROM billing_archives a WHERE a.owner_id=l.owner_id AND a.entity_type='entry' AND a.entity_id=l.id)", args,
     ) as cursor:
         rows = [list(r) for r in await cursor.fetchall()]
     xwhere = 'AND x.customer_id=?' if customer_id else ''
     async with db.execute(
-        "SELECT x.period, c.name, 'Extra: ' || x.charge_type || CASE WHEN x.description<>'' THEN ' - ' || x.description ELSE '' END, x.invoice_number, x.amount, x.distributor, x.distributor_invoice, x.distributor_amount, x.currency, x.amount_basis "
+        "SELECT x.period, c.name, 'Extra: ' || x.charge_type || CASE WHEN x.description<>'' THEN ' - ' || x.description ELSE '' END, x.invoice_number, x.amount, x.distributor, x.distributor_invoice, x.distributor_amount, x.currency, x.amount_basis, NULL, '' "
         f"FROM billing_extra_charges x JOIN billing_customers c ON c.id=x.customer_id WHERE x.owner_id=? {xwhere}", args,
     ) as cursor:
         rows += [list(r) for r in await cursor.fetchall()]
     rows.sort(key=lambda r: (r[0], (r[1] or '').lower(), r[2] or ''))
     out = io.StringIO()
     writer = csv.writer(out)
-    writer.writerow(['Month', 'Customer', 'Subscription', 'Invoice', 'Our billing', 'Distributor', 'Distributor invoice', 'Distributor amount', 'Profit / loss', 'Currency', 'Amounts'])
+    writer.writerow(['Month', 'Customer', 'Subscription', 'Invoice', 'Our billing', 'Distributor', 'Distributor invoice', 'Distributor amount', 'Profit / loss', 'Currency', 'Amounts', 'Amount received', 'Balance due', 'Payment remark'])
     safe = lambda v: ("'" + v) if v and v[0] in '=+@' else v
-    for period, cust, sub, inv, billed, dist, dinv, damt, cur, basis in rows:
+    for period, cust, sub, inv, billed, dist, dinv, damt, cur, basis, received, remark in rows:
         profit = '' if billed in (None, '') or damt in (None, '') else f'{Decimal(billed) - Decimal(damt):.2f}'
         money_ = lambda v: '' if v in (None, '') else f'{Decimal(v):.2f}'
-        writer.writerow([period, safe(cust or ''), safe(sub or ''), safe(inv or ''), money_(billed), safe(dist or ''), safe(dinv or ''), money_(damt), profit, cur, 'tax included' if basis == 'gross' else 'before tax' if basis == 'net' else ''])
+        writer.writerow([period, safe(cust or ''), safe(sub or ''), safe(inv or ''), money_(billed), safe(dist or ''), safe(dinv or ''), money_(damt), profit, cur, 'tax included' if basis == 'gross' else 'before tax' if basis == 'net' else '',
+                         money_(received), '' if billed in (None, '') or received in (None, '') else f'{Decimal(billed) - Decimal(received):.2f}', safe(remark or '')])
     return Response('\ufeff' + out.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="billing-entries.csv"'})
 
 

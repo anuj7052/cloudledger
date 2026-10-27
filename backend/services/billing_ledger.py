@@ -205,7 +205,7 @@ def month_totals(entries):
                        if (row['period'], row['currency']) == (group['period'], group['currency'])
                        and not row.get('archived') and not row.get('workload_archived')
                        and row['customer_amount'] is not None)
-        profit = revenue - cost if revenue is not None and cost is not None and complete and group['review_count'] == 0 and group['basis'] == {'net'} else None
+        profit = revenue - cost if revenue is not None and cost is not None and complete and group['review_count'] == 0 and len(group['basis']) == 1 and group['basis'] <= {'net', 'gross'} else None
         group.pop('basis')
         result.append({**{key: str(value) if isinstance(value, Decimal) else value for key, value in group.items()}, 'profit': str(profit) if profit is not None else None})
     return sorted(result, key=lambda item: (item['period'], item['currency']))

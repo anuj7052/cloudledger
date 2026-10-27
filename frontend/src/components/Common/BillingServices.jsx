@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { CalendarCheck, Download, FileText, Loader2, MessageSquare, Paperclip, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { CalendarCheck, Download, Eye, FileText, Loader2, MessageSquare, Paperclip, Pencil, Plus, Trash2, X } from 'lucide-react';
 import * as api from '../../api/client';
 import { errorMessage } from '../../utils/apiError';
 
@@ -53,6 +53,18 @@ function ServiceCard({ service, subName, canEdit, onChanged, onEdit, onDeleted }
   const [status, statusClass] = STATUS[service.status] || STATUS.active;
   const act = async (fn, ok) => { setBusy(true); try { await fn(); if (ok) toast.success(ok); await onChanged(); } catch (e) { toast.error(errorMessage(e)); } finally { setBusy(false); } };
   const upload = files => act(async () => { for (const f of files) await api.uploadBillingServiceFile(service.id, kind, f); if (fileRef.current) fileRef.current.value = ''; }, files.length > 1 ? `${files.length} documents uploaded` : 'Document uploaded');
+  const MIME = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', txt: 'text/plain', csv: 'text/plain' };
+  const viewable = f => !!MIME[f.filename.split('.').pop().toLowerCase()];
+  const view = async f => {
+    const tab = window.open('', '_blank');
+    try {
+      const raw = await api.downloadBillingServiceFile(f.id);
+      const blob = new Blob([raw], { type: MIME[f.filename.split('.').pop().toLowerCase()] });
+      const url = URL.createObjectURL(blob);
+      if (tab) tab.location.href = url; else window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) { tab?.close(); toast.error(errorMessage(e)); }
+  };
   const download = async f => { try { const blob = await api.downloadBillingServiceFile(f.id); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = f.filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (e) { toast.error(errorMessage(e)); } };
   const missing = [!service.po_number && 'PO', !service.files.some(f => f.kind === 'po') && 'PO document'].filter(Boolean);
   return (
@@ -72,7 +84,7 @@ function ServiceCard({ service, subName, canEdit, onChanged, onEdit, onDeleted }
         <section>
           <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500"><Paperclip size={13} />Documents & proof</h4>
           {canEdit && <div className="mt-2 flex flex-wrap items-center gap-2"><select aria-label="Document type" value={kind} onChange={e => setKind(e.target.value)} className="h-9 rounded-lg border border-slate-700 bg-slate-950 px-2 text-sm text-slate-200">{Object.entries(KINDS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select><input ref={fileRef} type="file" multiple className="hidden" onChange={e => e.target.files?.length && upload([...e.target.files])} /><button type="button" className={ghost} disabled={busy} onClick={() => fileRef.current?.click()}>{busy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}Upload</button></div>}
-          {!service.files.length ? <p className="mt-2 text-xs text-slate-500">No documents yet. Upload the PO, BOQ or approval email as proof.</p> : <ul className="mt-2 divide-y divide-slate-800 rounded-lg border border-slate-800">{service.files.map(f => <li key={f.id} className="flex items-center gap-2 px-3 py-2 text-sm"><FileText size={15} className="shrink-0 text-[#ea580c]" /><span className="rounded bg-[#ffedd5] px-1.5 text-[11px] font-medium text-[#9a3412]">{KINDS[f.kind] || f.kind}</span><span className="min-w-0 flex-1 truncate text-slate-200" title={f.filename}>{f.filename}</span><span className="hidden text-xs text-slate-500 sm:inline">{size(f.size)} · {when(f.created_at)}</span><button type="button" aria-label={`Download ${f.filename}`} onClick={() => download(f)} className="rounded p-1 text-slate-500 hover:text-[#c2410c]"><Download size={14} /></button>{canEdit && <button type="button" aria-label={`Delete ${f.filename}`} onClick={() => window.confirm(`Delete ${f.filename}?`) && act(() => api.deleteBillingServiceFile(f.id), 'Document deleted')} className="rounded p-1 text-slate-500 hover:text-red-400"><X size={14} /></button>}</li>)}</ul>}
+          {!service.files.length ? <p className="mt-2 text-xs text-slate-500">No documents yet. Upload the PO, BOQ or approval email as proof.</p> : <ul className="mt-2 divide-y divide-slate-800 rounded-lg border border-slate-800">{service.files.map(f => <li key={f.id} className="flex items-center gap-2 px-3 py-2 text-sm"><FileText size={15} className="shrink-0 text-[#ea580c]" /><span className="rounded bg-[#ffedd5] px-1.5 text-[11px] font-medium text-[#9a3412]">{KINDS[f.kind] || f.kind}</span><span className="min-w-0 flex-1 truncate text-slate-200" title={f.filename}>{f.filename}</span><span className="hidden text-xs text-slate-500 sm:inline">{size(f.size)} · {when(f.created_at)}</span>{viewable(f) && <button type="button" aria-label={`View ${f.filename}`} title="View" onClick={() => view(f)} className="rounded p-1 text-slate-500 hover:text-[#c2410c]"><Eye size={14} /></button>}<button type="button" aria-label={`Download ${f.filename}`} onClick={() => download(f)} className="rounded p-1 text-slate-500 hover:text-[#c2410c]"><Download size={14} /></button>{canEdit && <button type="button" aria-label={`Delete ${f.filename}`} onClick={() => window.confirm(`Delete ${f.filename}?`) && act(() => api.deleteBillingServiceFile(f.id), 'Document deleted')} className="rounded p-1 text-slate-500 hover:text-red-400"><X size={14} /></button>}</li>)}</ul>}
         </section>
         <section>
           <h4 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500"><MessageSquare size={13} />Notes</h4>

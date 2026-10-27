@@ -228,3 +228,32 @@ async def test_ledger_export_has_distributor_invoice_and_negative_loss(db):
     body = (await routes.export_ledger_csv('', user, db)).body.decode()
     assert 'Distributor invoice' in body and '2026-05,Export Co,Plan (Azure usage),C-1,100.00,Redington,R-9,150.00,-50.00' in body
     assert 'Extra: Other - Bandwidth' in body
+
+
+@pytest.mark.asyncio
+async def test_partial_edit_keeps_distributor_type_status_and_owner(db):
+    from routers import billing as customer_routes
+    user = {'account_id': 1, 'user_id': 'one', 'actor_id': 1}
+    c = await customer_routes.create_customer(customer_routes.CustomerInput(name='Keep Co'), user, db)
+    w = await routes.create_workload(c['id'], routes.WorkloadInput(name='Prod', owner='Ravi'), user, db)
+    e = await routes.create_entry(w['id'], routes.EntryInput(period='2026-05', currency='INR', customer_amount='100', distributor='Redington', distributor_invoice='R-1', billing_type='One-time RI', status='needs_review', received_amount='60', received_on='2026-06-02', payment_status='TDS deducted'), user, db)
+    # Older screen sends only the core fields.
+    await routes.update_entry(e['id'], routes.EntryInput(period='2026-05', currency='INR', customer_amount='120', revision=e['revision']), user, db)
+    after = await ledger.get_entity(db, 1, 'entry', e['id'])
+    assert (after['customer_amount'], after['distributor'], after['distributor_invoice'], after['billing_type'], after['status'], after['received_amount'], after['payment_status']) == ('120', 'Redington', 'R-1', 'One-time RI', 'needs_review', '60', 'TDS deducted')
+    w2 = await ledger.get_entity(db, 1, 'workload', w['id'])
+    await routes.update_workload(w['id'], routes.WorkloadInput(name='Prod 2', revision=w2['revision']), user, db)
+    assert (await ledger.get_entity(db, 1, 'workload', w['id']))['owner'] == 'Ravi'
+
+
+@pytest.mark.asyncio
+async def test_tax_included_amounts_still_give_profit_and_received(db):
+    from datetime import date
+    from routers import billing as customer_routes
+    from services.billing_dashboard import load
+    user = {'account_id': 1, 'user_id': 'one', 'actor_id': 1}
+    c = await customer_routes.create_customer(customer_routes.CustomerInput(name='Gross Co'), user, db)
+    w = await routes.create_workload(c['id'], routes.WorkloadInput(name='Plan', frequency='Monthly'), user, db)
+    await routes.create_entry(w['id'], routes.EntryInput(period='2026-07', currency='INR', customer_amount='1180', distributor_amount='1000', amount_basis='gross', received_amount='500'), user, db)
+    row = (await load(db, 1, date(2026, 7, 1), date(2026, 7, 31)))['customers'][0]
+    assert row['profit'] == '180.00' and row['received_amount'] == '500.00'

@@ -6,6 +6,7 @@ import { errorMessage } from '../utils/apiError';
 import { dashboardFilters, dashboardPayload, exactDays, monthRange, rollingRange } from '../utils/billingDashboard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/billing-ui/card';
 import { BillingPage, BillingNotice } from '../components/billing-ui/workspace';
+import CompanyBillingView from '../components/Common/CompanyBillingView';
 import { ShareBreakdown } from '../components/Charts/CostDashboardCharts';
 
 const control = 'mt-1.5 h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
@@ -68,7 +69,7 @@ function DashboardReport({ filters, onMetadata }) {
       <ShareBreakdown title="Distributor amount" description="Split by distributor." icon={FileText} items={distributorItems} loading={loading} currency={currency} emptyMessage="No distributor amounts for this period." stacked listLimit={5} />
       <ShareBreakdown title="Where our billing goes" description="Distributor cost versus what we keep." icon={TrendingUp} items={splitItems} loading={loading} currency={currency} emptyMessage="Needs both billing and distributor amounts." stacked />
     </div>
-    <CustomerTable rows={result?.customers || []} fmtShort={fmtShort} />
+    {filters.customer ? <CompanyBillingView key={filters.customer} customerId={filters.customer} from={filters.from} to={filters.to} /> : <CustomerTable rows={result?.customers || []} fmtShort={fmtShort} />}
   </div>;
 }
 

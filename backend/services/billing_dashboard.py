@@ -35,7 +35,7 @@ def aggregate(customers, workloads, records, start, end, currency, source, extra
                      **{f: None for f in FIELDS}, 'record_count': 0, 'review_count': 0,
                      'unallocated_count': 0, 'missing_count': 0, 'prorated_count': 0,
                      'workload_count': sum(w['customer_id'] == c['id'] for w in workloads),
-                     'extra_amount': None, '_net': True, '_paired': True} for c in customers}
+                     'extra_amount': None, 'received_amount': None, '_bases': set(), '_paired': True} for c in customers}
     monthly = {}
     relevant = []
     by_distributor = {}
@@ -62,8 +62,10 @@ def aggregate(customers, workloads, records, start, end, currency, source, extra
             row['prorated_count'] += 1
         bucket = monthly.setdefault(record['period'], {'period': record['period'], 'selected_days': days, 'calendar_days': month_days, **{f: None for f in FIELDS}})
         has_value = any(record.get(f) is not None for f in FIELDS)
-        if has_value and record.get('amount_basis') != 'net':
-            row['_net'] = False
+        if has_value:
+            row['_bases'].add(record.get('amount_basis') or 'unspecified')
+        if record.get('received_amount') not in (None, ''):
+            row['received_amount'] = (row['received_amount'] or ZERO) + Decimal(record['received_amount']) * factor
         if (record.get('customer_amount') is None) != (record.get('distributor_amount') is None):
             # Imported rows can be paired at workload-month granularity. Invoice
             # documents are separate types and are paired by customer/month below.
@@ -93,8 +95,7 @@ def aggregate(customers, workloads, records, start, end, currency, source, extra
             row['unallocated_count'] += 1
             continue
         value = Decimal(extra['amount'])
-        if extra.get('amount_basis') != 'net':
-            row['_net'] = False
+        row['_bases'].add(extra.get('amount_basis') or 'unspecified')
         row['extra_amount'] = (row['extra_amount'] or ZERO) + value
         row['customer_amount'] = (row['customer_amount'] or ZERO) + value
         cost = Decimal(extra['distributor_amount']) if extra.get('distributor_amount') not in (None, '') else ZERO
@@ -113,16 +114,16 @@ def aggregate(customers, workloads, records, start, end, currency, source, extra
                 and any(r['customer_id'] == row['customer_id'] and r['period'] == p and r.get('distributor_amount') is not None and r['status'] == 'confirmed' for r in relevant)
                 for p in periods)
     values = list(rows.values())
-    totals = {'extra_amount': sum((r['extra_amount'] for r in values if r['extra_amount'] is not None), ZERO) if any(r['extra_amount'] is not None for r in values) else None}
+    totals = {'received_amount': sum((r['received_amount'] for r in values if r['received_amount'] is not None), ZERO) if any(r['received_amount'] is not None for r in values) else None, 'extra_amount': sum((r['extra_amount'] for r in values if r['extra_amount'] is not None), ZERO) if any(r['extra_amount'] is not None for r in values) else None}
     totals.update({f: sum((r[f] for r in values if r[f] is not None), ZERO) if any(r[f] is not None for r in values) else None for f in FIELDS})
     for row in values:
-        row['profit'] = row['customer_amount'] - row['distributor_amount'] if row['_net'] and row['_paired'] and not row['review_count'] and not row['unallocated_count'] and row['customer_amount'] is not None and row['distributor_amount'] is not None else None
+        row['profit'] = row['customer_amount'] - row['distributor_amount'] if len(row['_bases']) <= 1 and row['_bases'] <= {'net', 'gross'} and row['_paired'] and not row['review_count'] and not row['unallocated_count'] and row['customer_amount'] is not None and row['distributor_amount'] is not None else None
     # Do not sum only profitable/complete customers into a misleading overall P/L.
     contributors = [r for r in values if r['customer_amount'] is not None or r['distributor_amount'] is not None or r['review_count'] or r['unallocated_count']]
     totals['profit'] = sum((r['profit'] for r in contributors), ZERO) if contributors and all(r['profit'] is not None for r in contributors) else None
     mixed = not selected and len(currencies) > 1
     def public(row):
-        return {k: None if mixed and k in (*FIELDS, 'profit', 'extra_amount') else money(v) if isinstance(v, Decimal) else v for k, v in row.items() if not k.startswith('_')}
+        return {k: None if mixed and k in (*FIELDS, 'profit', 'extra_amount', 'received_amount') else money(v) if isinstance(v, Decimal) else v for k, v in row.items() if not k.startswith('_')}
     return {
         'from_date': start.isoformat(), 'to_date': end.isoformat(), 'days': (end - start).days + 1,
         'source': source, 'currency': selected or None, 'currencies': currencies,

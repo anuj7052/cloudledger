@@ -155,6 +155,8 @@ async def profile(customer_id: str, user=Depends(get_current_user), db=Depends(g
 async def upload_document(customer_id: str, kind: Literal["customer", "distributor", "azure_usage"] = Form(...), period: str = Form(..., pattern=r"^\d{4}-(0[1-9]|1[0-2])$"), file: UploadFile = File(...), graph_token: str = Header(default="", alias="X-Billing-Graph-Token"), user=Depends(require_workspace_admin), db: aiosqlite.Connection = Depends(get_db)):
     owner = user["account_id"]
     await customer_for(db, owner, customer_id)
+    if await ledger.is_archived(db, owner, "customer", customer_id):
+        raise HTTPException(409, "Restore this customer before uploading bills.")
     destination = await connection_for(db, owner)
     filename = (file.filename or "invoice").replace("\\", "/").rsplit("/", 1)[-1][:180]
     extension = Path(filename).suffix.lower()
@@ -213,6 +215,8 @@ async def review_document(document_id: str, body: ReviewInput, user=Depends(requ
         raise HTTPException(404, "Bill not found.")
     if row["status"] == "void":
         raise HTTPException(409, "This bill was excluded. Upload the corrected document instead.")
+    if await ledger.is_archived(db, user["account_id"], "customer", row["customer_id"]):
+        raise HTTPException(409, "Restore this customer before reviewing bills.")
     if body.invoice_number.strip():
         duplicate = await one(db, "SELECT id FROM billing_documents WHERE owner_id=? AND customer_id=? AND kind=? AND invoice_number=? AND status='confirmed' AND id<>?", (user["account_id"], row["customer_id"], row["kind"], body.invoice_number.strip(), document_id))
         if duplicate:

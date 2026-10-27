@@ -43,7 +43,7 @@ function AddInline({ placeholder, onAdd, busy, onCancel, initial = '', label = '
 
 const BILLING_TYPES = ['Azure usage', 'Monthly RI', 'One-time RI', 'Savings plan', 'Licence / subscription', 'Marketplace', 'Other'];
 const EXTRA_KINDS = ['Implementation', 'Migration', 'Consulting', 'Support', 'Licence', 'Training', 'Bandwidth', 'Other'];
-const EMPTY = { is_extra: false, billing_type: 'Azure usage', charge_type: 'Implementation', description: '', period: thisMonth(), invoice_number: '', customer_amount: '', distributor: '', distributor_invoice: '', distributor_amount: '', currency: 'INR', amount_basis: 'net' };
+const EMPTY = { is_extra: false, billing_type: 'Azure usage', charge_type: 'Implementation', description: '', period: thisMonth(), invoice_number: '', customer_amount: '', distributor: '', distributor_invoice: '', distributor_amount: '', received_amount: '', received_on: '', payment_status: '', currency: 'INR', amount_basis: 'net' };
 
 export default function BillingEntries() {
   const canEdit = useCanAdminister();
@@ -191,7 +191,8 @@ export default function BillingEntries() {
     setForm({
       period: entry.period, invoice_number: entry.invoice_number || '', customer_amount: entry.customer_amount ?? '',
       billing_type: entry.billing_type || 'Azure usage', is_extra: false, distributor: entry.distributor || '', distributor_invoice: entry.distributor_invoice || '', distributor_amount: entry.distributor_amount ?? '', currency: entry.currency || 'INR',
-      amount_basis: entry.amount_basis === 'gross' ? 'gross' : 'net',
+      amount_basis: entry.amount_basis || 'unspecified',
+      received_amount: entry.received_amount ?? '', received_on: entry.received_on || '', payment_status: entry.payment_status || '',
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -223,7 +224,10 @@ export default function BillingEntries() {
         invoice_number: form.invoice_number.trim(),
         customer_amount: form.customer_amount === '' ? null : form.customer_amount,
         distributor_amount: form.distributor_amount === '' ? null : form.distributor_amount,
-        ...(existing ? { revision: existing.revision, notes: existing.notes || '', payment_status: existing.payment_status || '', usage_amount: existing.usage_amount } : {}),
+        received_amount: form.received_amount === '' ? null : form.received_amount,
+        received_on: form.received_on || '',
+        payment_status: form.payment_status.trim(),
+        ...(existing ? { revision: existing.revision, notes: existing.notes || '', usage_amount: existing.usage_amount, status: existing.status } : {}),
       };
       await saveBillingEntry(workloadId, existing?.id, body);
       setLedger(await getBillingLedger(customerId));
@@ -315,10 +319,20 @@ export default function BillingEntries() {
                 <span className={`text-sm font-semibold tabular-nums ${profit == null ? 'text-slate-500' : profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{profit == null ? 'Enter both amounts' : money(profit, form.currency)}</span>
               </div>
 
+              {!form.is_extra && <div className="space-y-3 rounded-lg border border-slate-800 p-3">
+                <p className="text-xs font-semibold text-slate-300">Payment received <span className="font-normal text-slate-500">(optional)</span></p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label htmlFor="be-recv">Amount received</Label><Input id="be-recv" className="mt-1.5 tabular-nums" type="number" min="0" step="0.01" inputMode="decimal" value={form.received_amount} onChange={e => set({ received_amount: e.target.value })} placeholder="0.00" /></div>
+                  <div><Label htmlFor="be-recv-on">Received on</Label><Input id="be-recv-on" className="mt-1.5" type="date" value={form.received_on} onChange={e => set({ received_on: e.target.value })} /></div>
+                </div>
+                <div><Label htmlFor="be-remark">Payment remark</Label><textarea id="be-remark" rows={2} maxLength={1000} value={form.payment_status} onChange={e => set({ payment_status: e.target.value })} placeholder="e.g. TDS deducted 2%, balance due next month" className="mt-1.5 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-[#ea580c]" /></div>
+                {form.customer_amount !== '' && form.received_amount !== '' && <p className="text-xs text-slate-400">Balance due: <span className={`font-semibold ${Number(form.customer_amount) - Number(form.received_amount) > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>{money(Number(form.customer_amount) - Number(form.received_amount), form.currency)}</span></p>}
+              </div>}
+
               <div className="flex items-center justify-between gap-3">
                 <label className="text-xs text-slate-400">Amounts are{' '}
                   <select value={form.amount_basis} onChange={e => set({ amount_basis: e.target.value })} className="rounded border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-xs text-slate-200">
-                    <option value="net">before tax</option><option value="gross">including tax</option>
+                    {form.amount_basis === 'unspecified' && <option value="unspecified">not set — choose</option>}<option value="net">before tax</option><option value="gross">including tax</option>
                   </select>
                 </label>
                 {existing && <span className="text-xs text-amber-300">This month exists — saving updates it</span>}
@@ -343,9 +357,9 @@ export default function BillingEntries() {
           </div>
           {!customerId ? null : !ledger ? <p className="flex items-center gap-2 p-8 text-sm text-slate-400"><Loader2 className="h-4 w-4 animate-spin" />Loading…</p> : !rows.length ? <p className="p-8 text-center text-sm text-slate-400">No months recorded yet. Use the form to add the first one.</p> : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[52rem] text-sm">
+              <table className="w-full min-w-[64rem] text-sm">
                 <thead><tr className="border-b border-slate-800 text-left text-xs text-slate-500">
-                  {['Month', 'Subscription', 'Invoice', 'Our billing', 'Distributor', 'Distributor invoice', 'Distributor amount', 'Profit / loss', ''].map(h => <th key={h} className={`px-4 py-2.5 font-medium ${['Our billing', 'Distributor amount', 'Profit / loss'].includes(h) ? 'text-right' : ''}`}>{h}</th>)}
+                  {['Month', 'Subscription', 'Invoice', 'Our billing', 'Distributor', 'Distributor invoice', 'Distributor amount', 'Profit / loss', 'Received', 'Payment remark', ''].map(h => <th key={h} className={`px-4 py-2.5 font-medium ${['Our billing', 'Distributor amount', 'Profit / loss', 'Received'].includes(h) ? 'text-right' : ''}`}>{h}</th>)}
                 </tr></thead>
                 <tbody>
                   {rows.map(e => e._extra ? (
@@ -358,6 +372,8 @@ export default function BillingEntries() {
                       <td className="px-4 py-2.5 text-slate-400">{e.distributor_invoice || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-100">{e.distributor_amount != null ? money(e.distributor_amount, e.currency) : '—'}</td>
                       <td className={`whitespace-nowrap px-4 py-2.5 text-right font-semibold tabular-nums ${Number(e.amount) - Number(e.distributor_amount || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{money(Number(e.amount) - Number(e.distributor_amount || 0), e.currency)}</td>
+                      <td className="px-4 py-2.5 text-right text-slate-500">—</td>
+                      <td className="px-4 py-2.5 text-slate-500">—</td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-right">{canEdit && <button type="button" aria-label="Delete extra charge" title="Delete extra charge" onClick={async () => { if (!window.confirm(`Delete the ${e.charge_type} charge for ${monthName(e.period)}?`)) return; try { await deleteBillingExtraCharge(e.id); setExtras(list => list.filter(i => i.id !== e.id)); toast.success('Extra charge deleted'); } catch (err) { toast.error(errorMessage(err)); } }} className="ml-2 rounded p-1 text-slate-500 hover:bg-red-500/10 hover:text-red-400"><Trash2 className="inline h-3.5 w-3.5" /></button>}</td>
                     </tr>
                   ) : (() => {
@@ -374,6 +390,8 @@ export default function BillingEntries() {
                       <td className="px-4 py-2.5 text-slate-400">{e.distributor_invoice || '—'}</td>
                         <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-100">{money(e.distributor_amount, e.currency)}</td>
                         <td className={`whitespace-nowrap px-4 py-2.5 text-right font-semibold tabular-nums ${p == null ? 'text-slate-500' : p >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{p == null ? '—' : money(p, e.currency)}</td>
+                        <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">{e.received_amount != null ? <><span className="text-slate-100">{money(e.received_amount, e.currency)}</span>{e.customer_amount != null && Number(e.customer_amount) - Number(e.received_amount) > 0.005 && <span className="block text-[11px] text-amber-500">due {money(Number(e.customer_amount) - Number(e.received_amount), e.currency)}</span>}</> : <span className="text-slate-500">—</span>}</td>
+                        <td className="max-w-[14rem] truncate px-4 py-2.5 text-xs text-slate-400" title={e.payment_status}>{e.payment_status || '—'}</td>
                         <td className="whitespace-nowrap px-4 py-2.5 text-right"><Pencil className="inline h-3.5 w-3.5 text-slate-500" aria-label="Edit" />{canEdit && <button type="button" aria-label="Delete entry" title="Delete entry" onClick={ev => { ev.stopPropagation(); removeEntry(e); }} className="ml-2 rounded p-1 text-slate-500 hover:bg-red-500/10 hover:text-red-400"><Trash2 className="inline h-3.5 w-3.5" /></button>}</td>
                       </tr>
                     );
