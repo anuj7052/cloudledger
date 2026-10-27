@@ -39,6 +39,7 @@ def aggregate(customers, workloads, records, start, end, currency, source, extra
     monthly = {}
     relevant = []
     by_distributor = {}
+    dist_customers = {}
     for record in records:
         if record['customer_id'] not in names or (selected and record.get('currency') and record['currency'] != selected):
             continue
@@ -81,6 +82,7 @@ def aggregate(customers, workloads, records, start, end, currency, source, extra
         if record.get('distributor_amount') is not None:
             name = str(record.get('distributor') or '').strip() or 'Not set'
             by_distributor[name] = by_distributor.get(name, ZERO) + Decimal(record['distributor_amount']) * factor
+            per = dist_customers.setdefault(name, {}); per[record['customer_id']] = per.get(record['customer_id'], ZERO) + Decimal(record['distributor_amount']) * factor
     for extra in extras:
         # One-off charges (implementation, migration...) are billed income with
         # no distributor cost. They are counted only when the whole month is selected.
@@ -106,6 +108,7 @@ def aggregate(customers, workloads, records, start, end, currency, source, extra
             bucket['distributor_amount'] = (bucket['distributor_amount'] or ZERO) + cost
             name = str(extra.get('distributor') or '').strip() or 'Not set'
             by_distributor[name] = by_distributor.get(name, ZERO) + cost
+            per = dist_customers.setdefault(name, {}); per[extra['customer_id']] = per.get(extra['customer_id'], ZERO) + cost
     if source == 'invoices':
         for row in rows.values():
             periods = {r['period'] for r in relevant if r['customer_id'] == row['customer_id'] and (r.get('customer_amount') is not None or r.get('distributor_amount') is not None)}
@@ -136,7 +139,7 @@ def aggregate(customers, workloads, records, start, end, currency, source, extra
         'prorated_count': sum(r['prorated_count'] for r in values),
         'totals': public(totals), 'customers': [public(r) for r in values],
         'months': [public(monthly[p]) for p in sorted(monthly)],
-        'distributors': [] if mixed else [{'name': k, 'amount': money(v)} for k, v in sorted(by_distributor.items(), key=lambda item: -item[1])],
+        'distributors': [] if mixed else [{'name': k, 'amount': money(v), 'customers': [{'customer_id': cid, 'name': names.get(cid, ''), 'amount': money(a)} for cid, a in sorted(dist_customers.get(k, {}).items(), key=lambda item: -item[1])]} for k, v in sorted(by_distributor.items(), key=lambda item: -item[1])],
         'basis': 'Recurring monthly ledger amounts are allocated by selected calendar days. Partial-month invoices and one-time/unknown-frequency amounts are unallocated. This is not measured daily Azure usage.',
     }
 

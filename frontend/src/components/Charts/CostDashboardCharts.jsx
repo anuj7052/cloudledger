@@ -252,7 +252,7 @@ export function SpendOverTime({ series, daily, loading, error, currency, onRetry
  * Donut with a ranked list beside it. Shared by the service and subscription
  * breakdowns so both read the same way: hover a slice or a row to focus it.
  */
-export function ShareBreakdown({ title, description, icon, items, loading, currency, emptyMessage, stacked = false, listLimit = 0 }) {
+export function ShareBreakdown({ title, description, icon, items, loading, currency, emptyMessage, stacked = false, listLimit = 0, onSelect }) {
   const [focus, setFocus] = useState(null);
   const data = useMemo(() => {
     const top = items.slice(0, TOP_SERVICES);
@@ -280,6 +280,8 @@ export function ShareBreakdown({ title, description, icon, items, loading, curre
                   stroke="var(--color-slate-900)"
                   strokeWidth={2}
                   onMouseEnter={(_, index) => setFocus(data[index]?.key)}
+                  onClick={onSelect ? (_, index) => data[index] && data[index].key !== '__other' && onSelect(data[index]) : undefined}
+                  style={onSelect ? { cursor: 'pointer' } : undefined}
                   onMouseLeave={() => setFocus(null)}
                 >
                   {data.map(item => <Cell key={item.key} fill={item.color} opacity={!focus || focus === item.key ? 1 : 0.35} />)}
@@ -299,8 +301,9 @@ export function ShareBreakdown({ title, description, icon, items, loading, curre
                 <li
                   key={item.key}
                   onMouseEnter={() => setFocus(item.key)}
+                  onClick={onSelect && item.key !== '__other' ? () => onSelect(item) : undefined}
                   onMouseLeave={() => setFocus(null)}
-                  className={`rounded-lg px-2 py-1.5 transition ${focus === item.key ? 'bg-slate-800/70' : ''}`}
+                  className={`rounded-lg px-2 py-1.5 transition ${focus === item.key ? 'bg-slate-800/70' : ''} ${onSelect ? 'cursor-pointer' : ''}`}
                 >
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span className="flex min-w-0 items-center gap-2 text-slate-300">

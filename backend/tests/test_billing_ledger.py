@@ -214,7 +214,7 @@ async def test_extra_charge_with_distributor_cost_reduces_profit(db):
     report = await load(db, 1, date(2026, 6, 1), date(2026, 6, 30))
     row = report['customers'][0]
     assert row['customer_amount'] == '1000.00' and row['distributor_amount'] == '600.00' and row['profit'] == '400.00'
-    assert report['distributors'] == [{'name': 'Redington', 'amount': '600.00'}]
+    assert [(d['name'], d['amount']) for d in report['distributors']] == [('Redington', '600.00')] and report['distributors'][0]['customers'][0]['amount'] == '600.00'
 
 
 @pytest.mark.asyncio

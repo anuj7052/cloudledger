@@ -15,7 +15,8 @@ function SummaryCard({ label, value, hint, icon: Icon, accent = 'blue' }) {
   return <Card><CardHeader className="pb-3"><div className="flex items-center justify-between gap-2"><CardTitle className="text-sm font-medium text-slate-400">{label}</CardTitle><Icon size={18} className={accent === 'green' ? 'text-emerald-400' : 'text-blue-400'} aria-hidden="true" /></div></CardHeader><CardContent><p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p><p className="mt-2 text-xs leading-5 text-slate-400">{hint}</p></CardContent></Card>;
 }
 
-function DashboardReport({ filters, onMetadata }) {
+function DashboardReport({ filters, onMetadata, onCustomer }) {
+  const [detail, setDetail] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const refreshKey = 0;
@@ -65,15 +66,44 @@ function DashboardReport({ filters, onMetadata }) {
       ))}
     </div>
     <div className="grid gap-5 xl:grid-cols-3">
-      <ShareBreakdown title="Billing by customer" description={`Our billing, ${currency}. Hover a slice or row.`} icon={Building2} items={billingItems} loading={loading} currency={currency} emptyMessage="No billing entered for this period." stacked listLimit={5} />
-      <ShareBreakdown title="Distributor amount" description="Split by distributor." icon={FileText} items={distributorItems} loading={loading} currency={currency} emptyMessage="No distributor amounts for this period." stacked listLimit={5} />
-      <ShareBreakdown title="Where our billing goes" description="Distributor cost versus what we keep." icon={TrendingUp} items={splitItems} loading={loading} currency={currency} emptyMessage="Needs both billing and distributor amounts." stacked />
+      <ShareBreakdown title="Billing by customer" description={`Our billing, ${currency}. Click a slice or row for details.`} icon={Building2} items={billingItems} loading={loading} currency={currency} emptyMessage="No billing entered for this period." stacked listLimit={5} onSelect={item => setDetail({ kind: 'customer', key: item.key })} />
+      <ShareBreakdown title="Distributor amount" description="Split by distributor. Click for details." icon={FileText} items={distributorItems} loading={loading} currency={currency} emptyMessage="No distributor amounts for this period." stacked listLimit={5} onSelect={item => setDetail({ kind: 'distributor', key: item.key })} />
+      <ShareBreakdown title="Where our billing goes" description="Distributor cost versus what we keep. Click for details." icon={TrendingUp} items={splitItems} loading={loading} currency={currency} emptyMessage="Needs both billing and distributor amounts." stacked onSelect={() => setDetail({ kind: 'profit' })} />
     </div>
+    {detail && <DetailDialog detail={detail} result={result} filters={filters} onClose={() => setDetail(null)} onCustomer={id => { setDetail(null); onCustomer(id); }} />}
     {filters.customer ? <CompanyBillingView key={filters.customer} customerId={filters.customer} from={filters.from} to={filters.to} /> : <CustomerTable rows={result?.customers || []} fmtShort={fmtShort} />}
   </div>;
 }
 
 const noop = () => {};
+
+/* Opened by clicking a chart: the numbers behind that slice. */
+function DetailDialog({ detail, result, filters, onClose, onCustomer }) {
+  useEffect(() => { const k = e => e.key === 'Escape' && onClose(); window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
+  const cur = result?.currency || 'INR';
+  const m = v => (v == null ? '—' : `${cur} ${Number(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  const rows = (result?.customers || []).filter(r => r.customer_amount != null || r.distributor_amount != null);
+  let title = '', body = null;
+  if (detail.kind === 'customer') {
+    title = rows.find(r => r.customer_id === detail.key)?.name || 'Customer';
+    body = <div className="space-y-4"><CompanyBillingView customerId={detail.key} from={filters.from} to={filters.to} /></div>;
+  } else if (detail.kind === 'distributor') {
+    const d = (result?.distributors || []).find(x => x.name === detail.key);
+    title = `${detail.key} — ${m(d?.amount)}`;
+    body = <table className="w-full text-sm"><thead><tr className="border-b border-slate-800 text-left text-xs text-slate-500"><th className="py-2">Customer</th><th className="py-2 text-right">Distributor amount</th><th className="py-2 text-right">Share</th></tr></thead><tbody>{(d?.customers || []).map(c => <tr key={c.customer_id} className="border-b border-slate-800/60"><td className="py-2"><button type="button" className="text-left font-medium text-slate-200 hover:text-[#c2410c] hover:underline" onClick={() => onCustomer(c.customer_id)}>{c.name}</button></td><td className="py-2 text-right tabular-nums">{m(c.amount)}</td><td className="py-2 text-right text-slate-400">{d?.amount ? `${((Number(c.amount) / Number(d.amount)) * 100).toFixed(1)}%` : '—'}</td></tr>)}</tbody></table>;
+  } else {
+    title = 'Profit by customer';
+    body = <table className="w-full text-sm"><thead><tr className="border-b border-slate-800 text-left text-xs text-slate-500"><th className="py-2">Customer</th><th className="py-2 text-right">Billing</th><th className="py-2 text-right">Distributor</th><th className="py-2 text-right">Profit / loss</th></tr></thead><tbody>{[...rows].sort((a, b) => (Number(b.customer_amount) - Number(b.distributor_amount || 0)) - (Number(a.customer_amount) - Number(a.distributor_amount || 0))).map(r => { const p = r.customer_amount != null && r.distributor_amount != null ? Number(r.customer_amount) - Number(r.distributor_amount) : null; return <tr key={r.customer_id} className="border-b border-slate-800/60"><td className="py-2"><button type="button" className="text-left font-medium text-slate-200 hover:text-[#c2410c] hover:underline" onClick={() => onCustomer(r.customer_id)}>{r.name}</button></td><td className="py-2 text-right tabular-nums">{m(r.customer_amount)}</td><td className="py-2 text-right tabular-nums">{m(r.distributor_amount)}</td><td className={`py-2 text-right font-semibold tabular-nums ${p == null ? 'text-slate-500' : p >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>{m(p)}</td></tr>; })}</tbody></table>;
+  }
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8" onMouseDown={e => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label={title} className="w-full max-w-5xl rounded-2xl border border-slate-800 bg-[#fbf3ec] p-5 shadow-2xl">
+        <div className="mb-4 flex items-start justify-between gap-3"><h2 className="text-lg font-semibold text-slate-100">{title}</h2><div className="flex gap-2">{detail.kind === 'customer' && <button type="button" onClick={() => onCustomer(detail.key)} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:border-[#ea580c]">Filter overview to this customer</button>}<button type="button" onClick={onClose} aria-label="Close" className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:border-[#ea580c]">Close ✕</button></div></div>
+        {body}
+      </div>
+    </div>
+  );
+}
 
 function CustomerTable({ rows, fmtShort }) {
   const [all, setAll] = useState([]);
@@ -89,7 +119,9 @@ function CustomerTable({ rows, fmtShort }) {
     ...rows.filter(r => !all.some(c => c.id === r.customer_id)),
   ].sort((x, y) => (Number(y.customer_amount) || 0) - (Number(x.customer_amount) || 0) || x.name.localeCompare(y.name));
   const q = query.trim().toLowerCase();
-  const shown = q ? merged.filter(r => [r.name, r.detail].some(v => (v || '').toLowerCase().includes(q))) : merged;
+  const [all2, setAll2] = useState(false);
+  const matched = q ? merged.filter(r => [r.name, r.detail].some(v => (v || '').toLowerCase().includes(q))) : merged;
+  const shown = all2 || q ? matched : matched.slice(0, 10);
   return <Card>
     <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 pb-3">
       <div><CardTitle className="text-base">Customers ({merged.length})</CardTitle><CardDescription>Click a customer to open it.</CardDescription></div>
@@ -111,6 +143,8 @@ function CustomerTable({ rows, fmtShort }) {
             <td className={`px-3 py-2.5 text-right font-semibold tabular-nums ${p == null ? 'text-slate-500' : p >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{fmtShort(p)}</td>
           </tr>;
         })}
+        {!all2 && !q && matched.length > 10 && <tr><td colSpan={4} className="px-3 py-3 text-center"><button type="button" onClick={() => setAll2(true)} className="rounded-lg border border-[#ea580c] px-4 py-2 text-sm font-semibold text-[#c2410c] hover:bg-[#ffedd5]">View all customers ({matched.length})</button></td></tr>}
+        {all2 && !q && matched.length > 10 && <tr><td colSpan={4} className="px-3 py-3 text-center"><button type="button" onClick={() => setAll2(false)} className="text-sm text-slate-500 hover:text-[#c2410c]">Show fewer</button></td></tr>}
         {!shown.length && <tr><td colSpan={4} className="px-3 py-6 text-center text-slate-500">{q ? `No customer matches "${query}".` : 'No customers yet. Create your first one.'}</td></tr>}</tbody>
       </table>
     </CardContent>
@@ -195,6 +229,6 @@ export default function BillingDashboard() {
   const month = Number(filters.from.slice(5, 7)) || 1;
   const tab = (on, extra = '') => `rounded-md px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ea580c] ${on ? 'bg-[#ea580c] text-[#ffffff] shadow-sm' : 'text-slate-500 hover:bg-[#ffedd5] hover:text-[#9a3412]'} ${extra}`;
   return <BillingPage title="Billing overview" actions={<div className="flex flex-wrap items-center gap-2"><CustomerPicker value={filters.customer} onChange={customer => change({ customer })} /><PeriodPicker filters={filters} year={year} month={month} change={change} tab={tab} /></div>}>
-    <DashboardReport key={JSON.stringify(filters)} filters={filters} onMetadata={noop} />
+    <DashboardReport key={JSON.stringify(filters)} filters={filters} onMetadata={noop} onCustomer={customer => change({ customer })} />
   </BillingPage>;
 }
