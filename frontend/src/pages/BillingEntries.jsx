@@ -387,7 +387,6 @@ export default function BillingEntries() {
                         <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-100">{money(e.customer_amount, e.currency)}</td>
                         <td className="px-4 py-2.5 text-slate-300">{e.distributor || '—'}</td>
                         <td className="px-4 py-2.5 text-slate-400">{e.distributor_invoice || '—'}</td>
-                      <td className="px-4 py-2.5 text-slate-400">{e.distributor_invoice || '—'}</td>
                         <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-100">{money(e.distributor_amount, e.currency)}</td>
                         <td className={`whitespace-nowrap px-4 py-2.5 text-right font-semibold tabular-nums ${p == null ? 'text-slate-500' : p >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{p == null ? '—' : money(p, e.currency)}</td>
                         <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">{e.received_amount != null ? <><span className="text-slate-100">{money(e.received_amount, e.currency)}</span>{e.customer_amount != null && Number(e.customer_amount) - Number(e.received_amount) > 0.005 && <span className="block text-[11px] text-amber-500">due {money(Number(e.customer_amount) - Number(e.received_amount), e.currency)}</span>}</> : <span className="text-slate-500">—</span>}</td>
