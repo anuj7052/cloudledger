@@ -49,13 +49,13 @@ export default function CompanyBillingView({ customerId, from, to }) {
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {[['Billed', total.billed], ['Distributor cost', total.cost], ['Profit / loss', total.billed - total.cost], ['Received', total.received], ['Balance due', due]].map(([k, v]) => (
-          <div key={k} className={`${card} p-4`}><p className="text-xs text-slate-500">{k}</p><p className={`mt-1 text-lg font-semibold tabular-nums ${k === 'Profit / loss' ? (v >= 0 ? 'text-emerald-500' : 'text-rose-400') : k === 'Balance due' && v > 0.005 ? 'text-amber-500' : 'text-slate-100'}`}>{fmt(v)}</p></div>
+        {[['Billed', total.billed], ['Distributor cost', total.cost || null], ['Profit / loss', total.cost ? total.billed - total.cost : null], ['Received', total.received], ['Balance due', due]].map(([k, v]) => (
+          <div key={k} className={`${card} p-4`}><p className="text-xs text-slate-500">{k}</p><p className={`mt-1 text-lg font-semibold tabular-nums ${k === 'Profit / loss' && v != null ? (v >= 0 ? 'text-emerald-500' : 'text-rose-400') : k === 'Balance due' && v > 0.005 ? 'text-amber-500' : 'text-slate-100'}`}>{fmt(v)}</p></div>
         ))}
       </div>
 
       <section className={card}>
-        <h3 className="border-b border-slate-800 px-5 py-3 font-semibold text-slate-100">Month by month</h3>
+        <h3 className="border-b border-slate-800 px-5 py-3 font-semibold text-slate-100">Month by month <span className="text-xs font-normal text-slate-500">· profit shows once the distributor amount is entered</span></h3>
         {!rows.length ? <p className="p-5 text-sm text-slate-400">No billing in this period.</p> : (
           <div className="overflow-x-auto"><table className="w-full min-w-[48rem] text-sm">
             <thead><tr className="border-b border-slate-800 text-left text-xs text-slate-500">{['Month', 'Billed', 'of which extra', 'Distributor', 'Profit / loss', 'Received', 'Balance due'].map(h => <th key={h} className={`px-4 py-2.5 font-medium ${h === 'Month' ? '' : 'text-right'}`}>{h}</th>)}</tr></thead>
@@ -65,7 +65,7 @@ export default function CompanyBillingView({ customerId, from, to }) {
                 <td className="px-4 py-2.5 text-right tabular-nums">{fmt(m.billed)}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums text-slate-400">{m.extra ? fmt(m.extra) : '—'}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{m.cost ? fmt(m.cost) : '—'}</td>
-                <td className={`px-4 py-2.5 text-right font-semibold tabular-nums ${m.billed - m.cost >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>{fmt(m.billed - m.cost)}</td>
+                <td className={`px-4 py-2.5 text-right font-semibold tabular-nums ${!m.cost ? 'text-slate-500' : m.billed - m.cost >= 0 ? 'text-emerald-500' : 'text-rose-400'}`}>{m.cost ? fmt(m.billed - m.cost) : '—'}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{m.received ? fmt(m.received) : '—'}</td>
                 <td className={`px-4 py-2.5 text-right tabular-nums ${m.billed - m.received > 0.005 ? 'text-amber-500' : 'text-emerald-500'}`}>{fmt(m.billed - m.received)}</td>
               </tr>
