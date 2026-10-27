@@ -19,7 +19,7 @@ export default function CompanyBillingView({ customerId, from, to }) {
   useEffect(() => {
     let live = true;
     Promise.all([api.getBillingLedger(customerId), api.listBillingExtraCharges(customerId).catch(() => ({ items: [] })), api.listBillingServices(customerId).catch(() => ({ items: [] })), api.listCombinedBills(customerId).catch(() => ({ items: [] }))])
-      .then(([ledger, extras, services, bills]) => { if (live) setData({ ledger, services: services.items || [], extras: [...(extras.items || []), ...(bills.items || []).flatMap(b => b.lines.map((l, i) => ({ id: `${b.id}-${i}`, period: b.period, charge_type: `Tenant bill · ${l.type}`, description: '', invoice_number: b.invoice_number, amount: l.amount, distributor_amount: l.distributor_amount, distributor: b.distributor, currency: b.currency, received_amount: i === 0 ? b.received_amount : null, payment_status: i === 0 ? b.payment_status : '' })))] }); })
+      .then(([ledger, extras, services, bills]) => { if (live) setData({ ledger, services: services.items || [], extras: [...(extras.items || []), ...(bills.items || []).flatMap(b => b.lines.map((l, i) => ({ id: `${b.id}-${i}`, period: b.period, charge_type: `Tenant bill · ${l.type}`, description: '', invoice_number: l.invoice_number || b.invoice_number, amount: l.amount, distributor_amount: l.distributor_amount, distributor: l.distributor || b.distributor, currency: b.currency, received_amount: i === 0 ? b.received_amount : null, payment_status: i === 0 ? b.payment_status : '' })))] }); })
       .catch(() => { if (live) setData({ ledger: { entries: [], workloads: [] }, extras: [], services: [] }); });
     return () => { live = false; };
   }, [customerId]);

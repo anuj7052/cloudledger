@@ -27,6 +27,9 @@ class Line(BaseModel):
     amount: Decimal = Field(ge=0, **MONEY)
     distributor_amount: Decimal | None = Field(default=None, ge=0, **MONEY)
     split: dict[str, Decimal] = Field(default_factory=dict)
+    invoice_number: str = Field(default='', max_length=200)
+    distributor: str = Field(default='', max_length=120)
+    distributor_invoice: str = Field(default='', max_length=200)
 
     @model_validator(mode='after')
     def split_adds_up(self):
@@ -70,7 +73,8 @@ async def check(db, owner, customer_id, body):
 
 def encode(body):
     return json.dumps([{'type': l.type, 'amount': str(l.amount), 'distributor_amount': None if l.distributor_amount is None else str(l.distributor_amount),
-                        'split': {k: str(v) for k, v in l.split.items() if v}} for l in body.lines])
+                        'split': {k: str(v) for k, v in l.split.items() if v},
+                        'invoice_number': l.invoice_number.strip(), 'distributor': l.distributor.strip(), 'distributor_invoice': l.distributor_invoice.strip()} for l in body.lines])
 
 
 @router.get('/customers/{customer_id}/combined-bills')

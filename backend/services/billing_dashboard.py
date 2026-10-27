@@ -174,5 +174,5 @@ async def load(db, owner, start, end, currency='', source='ledger', customer_id=
                     continue
                 for line in _json.loads(r['lines'] or '[]'):
                     extras.append({'customer_id': r['customer_id'], 'period': r['period'], 'amount': line['amount'], 'currency': r['currency'],
-                                   'amount_basis': r['amount_basis'], 'distributor': r['distributor'], 'distributor_amount': line.get('distributor_amount')})
+                                   'amount_basis': r['amount_basis'], 'distributor': line.get('distributor') or r['distributor'], 'distributor_amount': line.get('distributor_amount')})
     return aggregate(customers, workloads, records, start, end, currency, source, extras)

@@ -14,12 +14,12 @@ const TYPES = ['Pay-as-you-go', 'Monthly RI', 'One-time RI', 'Savings plan', 'Li
 const box = 'h-9 w-full rounded-md border border-slate-700 bg-slate-950 px-2 text-sm text-slate-100 tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-[#ea580c]';
 const money = v => `INR ${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const r2 = v => Math.round(v * 100) / 100;
-const blankLine = type => ({ type, amount: '', distributor_amount: '', split: {} });
+const blankLine = type => ({ type, amount: '', distributor_amount: '', invoice_number: '', distributor: '', distributor_invoice: '', split: {} });
 
 export default function CombinedBillForm({ customerId, subscriptions, distributors, existing, period: initialPeriod, onSaved, onCancel, monthHasEntries }) {
   const [f, setF] = useState(() => existing ? {
     ...existing, received_amount: existing.received_amount ?? '',
-    lines: existing.lines.map(l => ({ ...l, distributor_amount: l.distributor_amount ?? '', split: Object.fromEntries(Object.entries(l.split || {}).map(([k, v]) => [k, String(v)])) })),
+    lines: existing.lines.map(l => ({ invoice_number: '', distributor: '', distributor_invoice: '', ...l, distributor_amount: l.distributor_amount ?? '', split: Object.fromEntries(Object.entries(l.split || {}).map(([k, v]) => [k, String(v)])) })),
   } : { period: initialPeriod, invoice_number: '', distributor: '', distributor_invoice: '', amount_basis: 'gross', received_amount: '', payment_status: '', lines: ['Pay-as-you-go', 'Monthly RI', 'One-time RI'].map(blankLine) });
   const [busy, setBusy] = useState(false);
   const set = p => setF(x => ({ ...x, ...p }));
@@ -39,7 +39,7 @@ export default function CombinedBillForm({ customerId, subscriptions, distributo
       const body = {
         period: f.period, invoice_number: f.invoice_number.trim(), distributor: f.distributor.trim(), distributor_invoice: f.distributor_invoice.trim(), amount_basis: f.amount_basis,
         received_amount: f.received_amount === '' ? null : f.received_amount, payment_status: f.payment_status.trim(),
-        lines: used.map(l => ({ type: l.type, amount: l.amount, distributor_amount: l.distributor_amount === '' ? null : l.distributor_amount, split: splitTotal(l) > 0 ? Object.fromEntries(Object.entries(l.split).filter(([, v]) => Number(v) > 0)) : {} })),
+        lines: used.map(l => ({ type: l.type, amount: l.amount, invoice_number: (l.invoice_number || '').trim(), distributor: (l.distributor || '').trim(), distributor_invoice: (l.distributor_invoice || '').trim(), distributor_amount: l.distributor_amount === '' ? null : l.distributor_amount, split: splitTotal(l) > 0 ? Object.fromEntries(Object.entries(l.split).filter(([, v]) => Number(v) > 0)) : {} })),
       };
       const saved = existing ? await updateCombinedBill(existing.id, body) : await createCombinedBill(customerId, body);
       toast.success(existing ? 'Tenant bill updated' : 'Tenant bill saved');
@@ -65,6 +65,9 @@ export default function CombinedBillForm({ customerId, subscriptions, distributo
           <div className="mt-2 grid grid-cols-2 gap-2">
             <label className="text-[11px] text-slate-500">Our billing<input type="number" min="0" step="0.01" className={box} value={l.amount} onChange={e => setLine(i, { amount: e.target.value })} placeholder="0.00" /></label>
             <label className="text-[11px] text-slate-500">Distributor amount<input type="number" min="0" step="0.01" className={box} value={l.distributor_amount} onChange={e => setLine(i, { distributor_amount: e.target.value })} placeholder="0.00" /></label>
+            <label className="text-[11px] text-slate-500">Invoice number <span className="text-slate-600">(optional)</span><input className={box} value={l.invoice_number} onChange={e => setLine(i, { invoice_number: e.target.value })} placeholder={f.invoice_number || 'Same as bill'} /></label>
+            <label className="text-[11px] text-slate-500">Distributor <span className="text-slate-600">(optional)</span><input list="cb-dist" className={box} value={l.distributor} onChange={e => setLine(i, { distributor: e.target.value })} placeholder={f.distributor || 'Same as bill'} /></label>
+            <label className="col-span-2 text-[11px] text-slate-500">Distributor invoice <span className="text-slate-600">(optional)</span><input className={box} value={l.distributor_invoice} onChange={e => setLine(i, { distributor_invoice: e.target.value })} placeholder={f.distributor_invoice || 'Same as bill'} /></label>
           </div>
           {l.amount !== '' && subscriptions.length > 0 && (
             <details className="mt-2" open={splitTotal(l) > 0}>

@@ -379,7 +379,7 @@ export default function BillingEntries() {
                   {rows.map(e => e._bill ? (
                     <tr key={`b-${e.id}`} onClick={() => { setWorkloadId(TENANT); setEditingBill(e); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="cursor-pointer border-b border-slate-800/60 bg-[#fff7ed]/60 hover:bg-[#ffedd5]/60">
                       <td className="whitespace-nowrap px-4 py-2.5 text-slate-200">{monthName(e.period)}</td>
-                      <td className="max-w-[16rem] px-4 py-2.5 text-slate-300"><span className="mr-1.5 rounded-full bg-[#ea580c] px-2 py-0.5 text-[10px] font-semibold text-[#ffffff]">Tenant bill</span><span className="text-xs">{e.lines.map(l => l.type).join(' · ')}</span></td>
+                      <td className="max-w-[16rem] px-4 py-2.5 text-slate-300"><span className="mr-1.5 rounded-full bg-[#ea580c] px-2 py-0.5 text-[10px] font-semibold text-[#ffffff]">Tenant bill</span><span className="text-xs">{e.lines.map(l => `${l.type}${l.invoice_number ? ` (${l.invoice_number})` : ''}`).join(' · ')}</span></td>
                       <td className="px-4 py-2.5 text-slate-400">{e.invoice_number || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-100">{money(e.amount, e.currency)}</td>
                       <td className="px-4 py-2.5 text-slate-300">{e.distributor || '—'}</td>
