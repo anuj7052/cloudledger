@@ -381,11 +381,11 @@ export default function BillingEntries() {
                       <td className="whitespace-nowrap px-4 py-2.5 text-slate-200">{monthName(e.period)}</td>
                       <td className="max-w-[16rem] px-4 py-2.5 text-slate-300"><span className="mr-1.5 rounded-full bg-[#ea580c] px-2 py-0.5 text-[10px] font-semibold text-[#ffffff]">Tenant bill</span><span className="text-xs">{e.lines.map(l => `${l.type}${l.invoice_number ? ` (${l.invoice_number})` : ''}`).join(' · ')}</span></td>
                       <td className="px-4 py-2.5 text-slate-400">{e.invoice_number || '—'}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-100">{money(e.amount, e.currency)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-100">{e.amount ? money(e.amount, e.currency) : '—'}</td>
                       <td className="px-4 py-2.5 text-slate-300">{e.distributor || '—'}</td>
                       <td className="px-4 py-2.5 text-slate-400">{e.distributor_invoice || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-100">{e.distributor_amount != null ? money(e.distributor_amount, e.currency) : '—'}</td>
-                      <td className={`whitespace-nowrap px-4 py-2.5 text-right font-semibold tabular-nums ${e.distributor_amount == null ? 'text-slate-500' : e.amount - e.distributor_amount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{e.distributor_amount == null ? '—' : money(e.amount - e.distributor_amount, e.currency)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right text-xs text-slate-500">in totals</td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">{e.received_amount != null ? money(e.received_amount, e.currency) : '—'}</td>
                       <td className="max-w-[14rem] truncate px-4 py-2.5 text-xs text-slate-400" title={e.payment_status}>{e.payment_status || '—'}</td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-right"><Pencil className="inline h-3.5 w-3.5 text-slate-500" aria-label="Edit" />{canEdit && <button type="button" aria-label="Delete tenant bill" onClick={async ev => { ev.stopPropagation(); if (!window.confirm(`Delete the tenant bill for ${monthName(e.period)}?`)) return; try { await deleteCombinedBill(e.id); setBills(list => list.filter(b => b.id !== e.id)); toast.success('Tenant bill deleted'); } catch (err) { toast.error(errorMessage(err)); } }} className="ml-2 rounded p-1 text-slate-500 hover:bg-red-500/10 hover:text-red-400"><Trash2 className="inline h-3.5 w-3.5" /></button>}</td>

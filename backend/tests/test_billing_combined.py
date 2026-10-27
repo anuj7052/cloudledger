@@ -24,3 +24,10 @@ async def test_tenant_bill_split_counts_once_and_keeps_entries(db):  # noqa: F81
     with pytest.raises(ValidationError):
         routes.BillInput(period='2026-09', lines=[{'type': 'Pay-as-you-go', 'amount': '10', 'split': {it['id']: '3'}}])
     assert (await routes.delete_bill(bill['id'], U, db))['deleted']
+
+
+def test_distributor_only_line_split_checks_distributor_amount():
+    line = routes.Line(type='Monthly RI', distributor_amount='300', split={'a': '100', 'b': '200'})
+    assert line.amount == 0
+    with pytest.raises(ValidationError):
+        routes.Line(type='Monthly RI', distributor_amount='300', split={'a': '100'})

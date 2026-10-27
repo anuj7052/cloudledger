@@ -33,7 +33,7 @@ export default function CompanyBillingView({ customerId, from, to }) {
     const months = {};
     const add = (p, k, v) => { if (v == null) return; const m = (months[p] ||= { period: p, billed: 0, cost: 0, received: 0, extra: 0, count: 0 }); m[k] += v; };
     for (const e of entries) { add(e.period, 'billed', num(e.customer_amount)); add(e.period, 'cost', num(e.distributor_amount)); add(e.period, 'received', num(e.received_amount)); (months[e.period] ||= { period: e.period, billed: 0, cost: 0, received: 0, extra: 0, count: 0 }).count += 1; }
-    for (const x of extras) { add(x.period, 'billed', num(x.amount)); add(x.period, 'extra', num(x.amount)); add(x.period, 'cost', num(x.distributor_amount)); add(x.period, 'received', num(x.received_amount)); }
+    for (const x of extras) { add(x.period, 'billed', num(x.amount)); if (!x.charge_type.startsWith('Tenant bill')) add(x.period, 'extra', num(x.amount)); add(x.period, 'cost', num(x.distributor_amount)); add(x.period, 'received', num(x.received_amount)); }
     const rows = Object.values(months).sort((a, b) => b.period.localeCompare(a.period));
     const total = rows.reduce((t, m) => ({ billed: t.billed + m.billed, cost: t.cost + m.cost, received: t.received + m.received, extra: t.extra + m.extra }), { billed: 0, cost: 0, received: 0, extra: 0 });
     const subs = (data.ledger.workloads || []).filter(w => !w.archived).map(w => {
@@ -58,7 +58,7 @@ export default function CompanyBillingView({ customerId, from, to }) {
         <h3 className="border-b border-slate-800 px-5 py-3 font-semibold text-slate-100">Month by month <span className="text-xs font-normal text-slate-500">· profit shows once the distributor amount is entered</span></h3>
         {!rows.length ? <p className="p-5 text-sm text-slate-400">No billing in this period.</p> : (
           <div className="overflow-x-auto"><table className="w-full min-w-[48rem] text-sm">
-            <thead><tr className="border-b border-slate-800 text-left text-xs text-slate-500">{['Month', 'Billed', 'of which extra / tenant bill', 'Distributor', 'Profit / loss', 'Received', 'Balance due'].map(h => <th key={h} className={`px-4 py-2.5 font-medium ${h === 'Month' ? '' : 'text-right'}`}>{h}</th>)}</tr></thead>
+            <thead><tr className="border-b border-slate-800 text-left text-xs text-slate-500">{['Month', 'Billed', 'of which extra', 'Distributor', 'Profit / loss', 'Received', 'Balance due'].map(h => <th key={h} className={`px-4 py-2.5 font-medium ${h === 'Month' ? '' : 'text-right'}`}>{h}</th>)}</tr></thead>
             <tbody>{rows.map(m => (
               <tr key={m.period} className="border-b border-slate-800/60 last:border-0">
                 <td className="px-4 py-2.5 text-slate-200">{monthName(m.period)}</td>

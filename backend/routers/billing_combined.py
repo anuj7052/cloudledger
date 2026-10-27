@@ -24,7 +24,7 @@ MONEY = dict(max_digits=18, decimal_places=4, allow_inf_nan=False)
 
 class Line(BaseModel):
     type: Literal[LINE_TYPES]
-    amount: Decimal = Field(ge=0, **MONEY)
+    amount: Decimal = Field(default=Decimal(0), ge=0, **MONEY)  # our billing; normally 0 here, billed per subscription
     distributor_amount: Decimal | None = Field(default=None, ge=0, **MONEY)
     split: dict[str, Decimal] = Field(default_factory=dict)
     invoice_number: str = Field(default='', max_length=200)
@@ -33,8 +33,9 @@ class Line(BaseModel):
 
     @model_validator(mode='after')
     def split_adds_up(self):
-        if self.split and abs(sum(self.split.values(), Decimal(0)) - self.amount) > Decimal('0.01'):
-            raise ValueError(f'{self.type}: the subscription split must add up to the line amount.')
+        target = self.amount if self.amount else (self.distributor_amount or Decimal(0))
+        if self.split and abs(sum(self.split.values(), Decimal(0)) - target) > Decimal('0.01'):
+            raise ValueError(f'{self.type}: the subscription split must add up to the distributor amount.')
         return self
 
 
