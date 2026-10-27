@@ -166,6 +166,10 @@ app = FastAPI(
         "deprecated aliases retained for the existing frontend."
     ),
     lifespan=lifespan,
+    # The interactive API reference maps every endpoint for an attacker; serve it only outside production.
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
 )
 
 # Order matters, and Starlette runs the *last* added middleware outermost.

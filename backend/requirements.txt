@@ -4,25 +4,26 @@
 # mirror is never built: every /api/v1 route disappears, taking its auth
 # dependencies with it, and tests/test_team.py catches it. Moving up is a
 # rewrite of _versioned(), not a version bump.
-fastapi==0.115.0
+fastapi==0.135.0
+starlette==1.10.0
 uvicorn[standard]==0.30.6
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 pydantic==2.13.5
 pydantic-settings==2.15.0
 httpx==0.28.1
 msal==1.38.0
-PyJWT[crypto]==2.13.0
+PyJWT[crypto]==2.15.0
 cryptography==50.0.1
 aiosqlite==0.22.1
 redis==5.2.1
 # Held at 2.x: pandas 3.0 changes copy-on-write and string dtype defaults,
 # which the CSV and BOQ parsers read into directly.
 pandas==2.2.3
-python-multipart==0.0.12
-aiohttp==3.14.3
+python-multipart==0.0.31
+aiohttp==3.14.4
 python-dateutil==2.9.0
 openpyxl==3.1.5
-pdfplumber==0.11.4
+pdfplumber==0.11.10
 openai==3.8.0
 reportlab>=4.0
 
