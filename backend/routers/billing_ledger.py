@@ -211,6 +211,7 @@ async def bulk_import_customers(file: UploadFile = File(...), user=Depends(requi
         if key not in customers:
             customers[key] = str(uuid.uuid4())
             await db.execute('INSERT INTO billing_customers(id,owner_id,name) VALUES(?,?,?)', (customers[key], owner, row['customer']))
+            await ledger.audit(db, owner, user['user_id'], 'customer', customers[key], 'create', {}, {'name': row['customer'], 'customer_id': customers[key], 'source': 'bulk import'})
             summary['customers_created'] += 1
         if not row['subscription']:
             continue
@@ -218,6 +219,7 @@ async def bulk_import_customers(file: UploadFile = File(...), user=Depends(requi
         if sub_key not in subs:
             sub_id = str(uuid.uuid4())
             await db.execute('INSERT INTO billing_workloads(id,owner_id,customer_id,name,owner) VALUES(?,?,?,?,?)', (sub_id, owner, customers[key], row['subscription'], row['owner']))
+            await ledger.audit(db, owner, user['user_id'], 'workload', sub_id, 'create', {}, {'name': row['subscription'], 'customer_id': customers[key], 'owner': row['owner'], 'source': 'bulk import'})
             subs[sub_key] = (sub_id, row['owner'])
             summary['subscriptions_created'] += 1
         elif row['owner'] and subs[sub_key][1] != row['owner']:
@@ -428,7 +430,7 @@ async def delete_extra_charge(charge_id: str, user=Depends(require_workspace_adm
 
 
 AUDIT_LABELS = {'customer': 'Customer', 'workload': 'Subscription', 'entry': 'Monthly entry', 'extra_charge': 'Extra charge',
-                'combined_bill': 'Tenant bill', 'service': 'PO / service', 'service_file': 'PO / BOQ document', 'service_note': 'PO note',
+                'combined_bill': 'Tenant bill', 'service': 'PO / service', 'service_file': 'PO / BOQ document', 'service_note': 'PO note', 'document': 'Bill / invoice upload',
                 'azure_link': 'Azure mapping', 'import': 'Import'}
 SKIP = {'revision', 'updated_at', 'created_at', 'updated_by', 'owner_id', 'id', 'raw_cells', 'source_import_id', 'source_row'}
 

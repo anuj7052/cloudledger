@@ -190,6 +190,8 @@ async def add_note(service_id: str, body: NoteInput, user=Depends(require_worksp
     key = str(uuid.uuid4())
     author = user.get('email') or user.get('name') or user['user_id']
     await db.execute('INSERT INTO billing_service_notes(id,owner_id,service_id,body,author) VALUES(?,?,?,?,?)', (key, owner, service_id, body.body.strip(), author))
+    svc = await service_for(db, owner, service_id)
+    await ledger.audit(db, owner, user['user_id'], 'service_note', key, 'create', {}, {'customer_id': svc['customer_id'], 'workload_id': svc['workload_id'], 'description': body.body.strip()[:200], 'service': svc['name']})
     await db.commit()
     return await one(db, 'SELECT id,service_id,body,author,created_at FROM billing_service_notes WHERE id=?', (key,))
 

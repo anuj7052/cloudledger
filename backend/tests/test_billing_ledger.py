@@ -279,3 +279,12 @@ async def test_audit_log_records_reason_and_field_changes(db):
     assert 'Audit Co' in upd['item'] and '2026-05' in upd['item']
     body = (await routes.audit_export(customer_id=c['id'], user=user, db=db)).body.decode()
     assert 'distributor_amount: 80 -> 85' in body and 'Distributor sent corrected invoice' in body
+
+
+@pytest.mark.asyncio
+async def test_new_customer_appears_in_audit_log(db):
+    from routers import billing as customer_routes
+    user = {'account_id': 1, 'user_id': 'one', 'actor_id': 1}
+    c = await customer_routes.create_customer(customer_routes.CustomerInput(name='Fresh Test Co'), user, db)
+    log = (await routes.audit_log(user=user, db=db))['items']
+    assert any(r['action'] == 'create' and r['entity_id'] == c['id'] and 'Fresh Test Co' in r['item'] for r in log)

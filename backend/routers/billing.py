@@ -131,6 +131,7 @@ async def customers(user=Depends(get_current_user), db=Depends(get_db)):
 async def create_customer(body: CustomerInput, user=Depends(require_workspace_admin), db=Depends(get_db)):
     key = str(uuid.uuid4())
     await db.execute("INSERT INTO billing_customers(id,owner_id,name,company,contact_email,notes) VALUES(?,?,?,?,?,?)", (key, user["account_id"], body.name.strip(), body.company, body.contact_email, body.notes))
+    await ledger.audit(db, user['account_id'], user['user_id'], 'customer', key, 'create', {}, {**body.model_dump(), 'customer_id': key})
     await db.commit()
     return await customer_for(db, user["account_id"], key)
 
@@ -187,6 +188,7 @@ async def upload_document(customer_id: str, kind: Literal["customer", "distribut
             saved = await sp.upload(client, graph_token, destination, owner, customer_id, period, kind, digest + extension, content)
     await db.execute("""INSERT INTO billing_documents(id,owner_id,customer_id,kind,period,filename,sha256,drive_id,item_id,web_url,uploaded_by)
         VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(owner_id,customer_id,kind,sha256) DO NOTHING""", (key, owner, customer_id, kind, period, filename, digest, destination["drive_id"], saved["id"], saved.get("webUrl", ""), user["user_id"]))
+    await ledger.audit(db, owner, user['user_id'], 'document', key, 'create', {}, {'customer_id': customer_id, 'kind': kind, 'period': period, 'filename': filename})
     await db.commit()
     try:
         extracted, message = await asyncio.wait_for(invoices.extract_invoice(content, extension), timeout=55)
@@ -223,6 +225,9 @@ async def review_document(document_id: str, body: ReviewInput, user=Depends(requ
             raise HTTPException(409, "This invoice number has already been confirmed for this customer and bill type.")
     try:
         await db.execute("UPDATE billing_documents SET invoice_number=?,period=?,currency=?,net_amount=?,tax_amount=?,status='confirmed',reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=? AND owner_id=?", (body.invoice_number.strip(), body.period, body.currency, str(body.net_amount), str(body.tax_amount), user["user_id"], document_id, user["account_id"]))
+        await ledger.audit(db, user['account_id'], user['user_id'], 'document', document_id, 'update',
+                           {k: row.get(k) for k in ('customer_id', 'filename', 'invoice_number', 'period', 'currency', 'net_amount', 'tax_amount', 'status')},
+                           {'customer_id': row['customer_id'], 'filename': row['filename'], 'invoice_number': body.invoice_number.strip(), 'period': body.period, 'currency': body.currency, 'net_amount': str(body.net_amount), 'tax_amount': str(body.tax_amount), 'status': 'confirmed'})
         await db.commit()
     except Exception as exc:
         # Backstop the friendly precheck when two reviewers confirm at once.
@@ -235,10 +240,11 @@ async def review_document(document_id: str, body: ReviewInput, user=Depends(requ
 
 @router.post("/documents/{document_id}/exclude")
 async def exclude_document(document_id: str, user=Depends(require_workspace_admin), db=Depends(get_db)):
-    row = await one(db, "SELECT id FROM billing_documents WHERE id=? AND owner_id=?", (document_id, user["account_id"]))
+    row = await one(db, "SELECT id,customer_id,filename,status FROM billing_documents WHERE id=? AND owner_id=?", (document_id, user["account_id"]))
     if not row:
         raise HTTPException(404, "Bill not found.")
     await db.execute("UPDATE billing_documents SET status='void',reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=? AND owner_id=?", (user["user_id"], document_id, user["account_id"]))
+    await ledger.audit(db, user['account_id'], user['user_id'], 'document', document_id, 'update', dict(row), {**dict(row), 'status': 'void'})
     await db.commit()
     return {"status": "void"}
 
