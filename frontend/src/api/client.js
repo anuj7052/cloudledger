@@ -392,7 +392,27 @@ function wantsFreshData() {
   try { return Number(window.sessionStorage.getItem(FRESH_KEY) || 0) > Date.now(); } catch { return false; }
 }
 
+// Every edit or delete in Azure Billing asks why, and the reason is stored in
+// the audit log with the change.
+const REASON_SKIP = ['/billing/cost-notes/', '/billing/connection', '/billing/azure-links'];
+function needsChangeReason(config) {
+  const url = config.url || '';
+  const method = String(config.method || 'get').toLowerCase();
+  if (!url.startsWith('/billing/') || REASON_SKIP.some(p => url.startsWith(p))) return false;
+  if (method === 'put' || method === 'patch' || method === 'delete') return true;
+  return method === 'post' && /\/(archive|restore)$/.test(url);
+}
+
 api.interceptors.request.use(async (config) => {
+  if (needsChangeReason(config) && typeof window !== 'undefined') {
+    const reason = config.changeReason ?? window.prompt('Reason for this change (saved in the audit log):', '');
+    if (reason == null || !String(reason).trim()) {
+      const err = new Error('Not saved — a reason for the change is required.');
+      err.response = { data: { detail: 'Not saved — a reason for the change is required.' } };
+      throw err;
+    }
+    config.headers = { ...(config.headers || {}), 'X-Change-Reason': encodeURIComponent(String(reason).trim().slice(0, 1000)) };
+  }
   config.__inflightId = inflight.begin(config.url || '');
   if (wantsFreshData()) config.headers = { ...(config.headers || {}), 'X-Refresh': '1' };
   try {
@@ -1257,3 +1277,6 @@ export const listCombinedBills = customer => api.get(`/billing/customers/${encod
 export const createCombinedBill = (customer, body) => api.post(`/billing/customers/${encodeURIComponent(customer)}/combined-bills`, body).then(r => r.data);
 export const updateCombinedBill = (id, body) => api.put(`/billing/combined-bills/${encodeURIComponent(id)}`, body).then(r => r.data);
 export const deleteCombinedBill = id => api.delete(`/billing/combined-bills/${encodeURIComponent(id)}`).then(r => r.data);
+
+export const fetchBillingAudit = params => api.get('/billing/audit', { params }).then(r => r.data);
+export const exportBillingAudit = params => api.get('/billing/audit-export.csv', { params, responseType: 'blob' }).then(r => r.data);

@@ -223,7 +223,7 @@ app.add_middleware(
     # had lost access to their own subscriptions.
     allow_headers=[
         "Authorization", "Content-Type", "X-Request-ID",
-        "X-Graph-Token", "X-Azure-Token", "X-Refresh",
+        "X-Graph-Token", "X-Azure-Token", "X-Refresh", "X-Change-Reason",
     ],
     expose_headers=[
         "X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After",
@@ -236,6 +236,18 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
 register_routers(app, API_ROUTERS)
+
+
+@app.middleware("http")
+async def change_reason_context(request: Request, call_next):
+    """X-Change-Reason (URL-encoded) is recorded on every billing audit row."""
+    from urllib.parse import unquote
+    from services.billing_ledger import change_reason
+    token = change_reason.set(unquote(request.headers.get("x-change-reason", "")).strip())
+    try:
+        return await call_next(request)
+    finally:
+        change_reason.reset(token)
 
 
 @app.middleware("http")

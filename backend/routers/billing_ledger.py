@@ -425,3 +425,89 @@ async def delete_extra_charge(charge_id: str, user=Depends(require_workspace_adm
     await ledger.audit(db, owner, user['user_id'], 'extra_charge', charge_id, 'delete', extra_output(row), {})
     await db.commit()
     return {'deleted': True}
+
+
+AUDIT_LABELS = {'customer': 'Customer', 'workload': 'Subscription', 'entry': 'Monthly entry', 'extra_charge': 'Extra charge',
+                'combined_bill': 'Tenant bill', 'service': 'PO / service', 'service_file': 'PO / BOQ document', 'service_note': 'PO note',
+                'azure_link': 'Azure mapping', 'import': 'Import'}
+SKIP = {'revision', 'updated_at', 'created_at', 'updated_by', 'owner_id', 'id', 'raw_cells', 'source_import_id', 'source_row'}
+
+
+def _diff(before, after):
+    out = []
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return out
+    for key in sorted(set(before) | set(after)):
+        if key in SKIP or key not in after:
+            continue
+        a, b = before.get(key), after.get(key)
+        norm = lambda v: '' if v is None else (f'{Decimal(str(v)).normalize():f}' if isinstance(v, (int, float, Decimal)) or (isinstance(v, str) and v.replace('.', '', 1).isdigit()) else str(v))
+        if norm(a) != norm(b):
+            out.append({'field': key, 'old': '' if a is None else str(a)[:300], 'new': '' if b is None else str(b)[:300]})
+    return out
+
+
+async def _audit_rows(db, owner, start='', end='', user_filter='', kind='', action='', customer_id='', q='', limit=500):
+    sql = ("SELECT c.*, u.name AS user_name, u.email AS user_email FROM billing_changes c "
+           "LEFT JOIN users u ON u.azure_oid=c.actor WHERE c.owner_id=?")
+    args = [owner]
+    if start:
+        sql += ' AND c.created_at>=?'; args.append(start)
+    if end:
+        sql += ' AND c.created_at<?'; args.append(end + ' 99')
+    if kind:
+        sql += ' AND c.entity_type=?'; args.append(kind)
+    if action:
+        sql += ' AND c.action=?'; args.append(action)
+    sql += ' ORDER BY c.created_at DESC LIMIT ?'; args.append(min(limit, 5000))
+    async with db.execute(sql, args) as cursor:
+        raw = [dict(r) for r in await cursor.fetchall()]
+    async with db.execute('SELECT id,name FROM billing_customers WHERE owner_id=?', (owner,)) as cursor:
+        customers = {r[0]: r[1] for r in await cursor.fetchall()}
+    async with db.execute('SELECT id,name,customer_id FROM billing_workloads WHERE owner_id=?', (owner,)) as cursor:
+        workloads = {r[0]: (r[1], r[2]) for r in await cursor.fetchall()}
+    out = []
+    for r in raw:
+        before, after = json.loads(r['before_json'] or '{}'), json.loads(r['after_json'] or '{}')
+        both = {**(before if isinstance(before, dict) else {}), **(after if isinstance(after, dict) else {})}
+        cust = both.get('customer_id') or (r['entity_id'] if r['entity_type'] == 'customer' else '')
+        wid = both.get('workload_id') or (r['entity_id'] if r['entity_type'] == 'workload' else '')
+        if not cust and wid in workloads:
+            cust = workloads[wid][1]
+        name = both.get('name') or both.get('description') or both.get('filename') or both.get('invoice_number') or ''
+        item = ' → '.join(x for x in [customers.get(cust, both.get('customer') or ''), workloads.get(wid, ('',))[0] if r['entity_type'] != 'workload' else '', both.get('period') or '', str(name) if r['entity_type'] not in ('customer', 'workload') else str(both.get('name') or '')] if x)
+        row = {'id': r['id'], 'at': r['created_at'], 'user': r['user_name'] or r['user_email'] or r['actor'], 'email': r['user_email'] or '',
+               'action': r['action'], 'type': AUDIT_LABELS.get(r['entity_type'], r['entity_type']), 'entity_type': r['entity_type'], 'entity_id': r['entity_id'],
+               'customer_id': cust, 'item': item or r['entity_id'], 'changes': _diff(before, after) if r['action'] in ('update', 'map') else [],
+               'reason': r.get('reason') or '', 'before': before, 'after': after}
+        if customer_id and cust != customer_id:
+            continue
+        if user_filter and user_filter.lower() not in f"{row['user']} {row['email']}".lower():
+            continue
+        if q and q.lower() not in json.dumps([row['item'], row['reason'], row['changes'], row['user']]).lower():
+            continue
+        out.append(row)
+    return out
+
+
+@router.get('/audit')
+async def audit_log(from_date: str = '', to_date: str = '', user_filter: str = '', kind: str = '', action: str = '', customer_id: str = '', q: str = '',
+                    user=Depends(get_current_user), db=Depends(get_db)):
+    rows = await _audit_rows(db, user['account_id'], from_date, to_date, user_filter, kind, action, customer_id, q)
+    return {'items': rows, 'types': AUDIT_LABELS}
+
+
+@router.get('/audit-export.csv')
+async def audit_export(from_date: str = '', to_date: str = '', user_filter: str = '', kind: str = '', action: str = '', customer_id: str = '', q: str = '',
+                       user=Depends(get_current_user), db=Depends(get_db)):
+    import csv
+    from fastapi.responses import Response
+    rows = await _audit_rows(db, user['account_id'], from_date, to_date, user_filter, kind, action, customer_id, q, limit=5000)
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(['Date & time (UTC)', 'User', 'Email', 'Action', 'Type', 'Item', 'What changed', 'Reason'])
+    safe = lambda v: ("'" + v) if v and v[0] in '=+-@' else v
+    for r in rows:
+        changed = '; '.join(f"{c['field']}: {c['old'] or '—'} -> {c['new'] or '—'}" for c in r['changes'])
+        w.writerow([r['at'], safe(r['user']), r['email'], r['action'], r['type'], safe(r['item']), safe(changed), safe(r['reason'] or 'not recorded')])
+    return Response('\ufeff' + out.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="billing-audit.csv"'})

@@ -115,6 +115,7 @@ SCHEMAS = {
 }
 
 INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_billing_changes_owner ON billing_changes(owner_id,created_at)",
     "CREATE INDEX IF NOT EXISTS idx_billing_services_owner ON billing_services(owner_id,customer_id,workload_id)",
     "CREATE INDEX IF NOT EXISTS idx_billing_service_files ON billing_service_files(owner_id,service_id)",
     "CREATE INDEX IF NOT EXISTS idx_billing_service_notes ON billing_service_notes(owner_id,service_id)",
@@ -128,6 +129,7 @@ INDEXES = [
 
 # Columns added after the first release, applied to databases that already exist.
 MIGRATIONS = {
+    "billing_changes": {"reason": "TEXT NOT NULL DEFAULT ''"},
     "billing_ledger": {"distributor": "TEXT NOT NULL DEFAULT ''", "distributor_invoice": "TEXT NOT NULL DEFAULT ''", "billing_type": "TEXT NOT NULL DEFAULT 'Azure usage'", "received_amount": "TEXT", "received_on": "TEXT NOT NULL DEFAULT ''"},
     "billing_workloads": {"owner": "TEXT NOT NULL DEFAULT ''"},
     "billing_extra_charges": {"distributor": "TEXT NOT NULL DEFAULT ''", "distributor_amount": "TEXT", "distributor_invoice": "TEXT NOT NULL DEFAULT ''"},

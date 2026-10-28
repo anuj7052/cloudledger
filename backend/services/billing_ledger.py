@@ -115,9 +115,16 @@ async def one(db, sql, params):
     return dict(row) if row else None
 
 
+import contextvars
+
+# Set per request from the X-Change-Reason header (see main.py), so every audit
+# row records why the change was made without threading it through each route.
+change_reason = contextvars.ContextVar('change_reason', default='')
+
+
 async def audit(db, owner, actor, kind, key, action, before, after):
-    await db.execute('INSERT INTO billing_changes(id,owner_id,entity_type,entity_id,action,before_json,after_json,actor) VALUES(?,?,?,?,?,?,?,?)',
-                     (str(uuid.uuid4()), owner, kind, key, action, json.dumps(before), json.dumps(after), actor))
+    await db.execute('INSERT INTO billing_changes(id,owner_id,entity_type,entity_id,action,before_json,after_json,actor,reason) VALUES(?,?,?,?,?,?,?,?,?)',
+                     (str(uuid.uuid4()), owner, kind, key, action, json.dumps(before, default=str), json.dumps(after, default=str), actor, change_reason.get()[:1000]))
 
 
 async def get_entity(db, owner, kind, key):

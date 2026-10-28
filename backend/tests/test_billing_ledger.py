@@ -257,3 +257,25 @@ async def test_tax_included_amounts_still_give_profit_and_received(db):
     await routes.create_entry(w['id'], routes.EntryInput(period='2026-07', currency='INR', customer_amount='1180', distributor_amount='1000', amount_basis='gross', received_amount='500'), user, db)
     row = (await load(db, 1, date(2026, 7, 1), date(2026, 7, 31)))['customers'][0]
     assert row['profit'] == '180.00' and row['received_amount'] == '500.00'
+
+
+@pytest.mark.asyncio
+async def test_audit_log_records_reason_and_field_changes(db):
+    from routers import billing as customer_routes
+    from services.billing_ledger import change_reason
+    user = {'account_id': 1, 'user_id': 'one', 'actor_id': 1}
+    c = await customer_routes.create_customer(customer_routes.CustomerInput(name='Audit Co'), user, db)
+    w = await routes.create_workload(c['id'], routes.WorkloadInput(name='Prod'), user, db)
+    e = await routes.create_entry(w['id'], routes.EntryInput(period='2026-05', currency='INR', customer_amount='100', distributor_amount='80'), user, db)
+    token = change_reason.set('Distributor sent corrected invoice')
+    try:
+        await routes.update_entry(e['id'], routes.EntryInput(period='2026-05', currency='INR', customer_amount='100', distributor_amount='85', revision=e['revision']), user, db)
+    finally:
+        change_reason.reset(token)
+    log = (await routes.audit_log(customer_id=c['id'], user=user, db=db))['items']
+    upd = next(r for r in log if r['action'] == 'update')
+    assert upd['reason'] == 'Distributor sent corrected invoice'
+    assert {'field': 'distributor_amount', 'old': '80', 'new': '85'} in upd['changes']
+    assert 'Audit Co' in upd['item'] and '2026-05' in upd['item']
+    body = (await routes.audit_export(customer_id=c['id'], user=user, db=db)).body.decode()
+    assert 'distributor_amount: 80 -> 85' in body and 'Distributor sent corrected invoice' in body

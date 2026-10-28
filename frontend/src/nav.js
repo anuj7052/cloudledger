@@ -65,6 +65,10 @@ export const SECTIONS = [
         blurb: 'Link Azure subscriptions to billing customers so PO/BOQ notes show on the cost dashboard.',
       },
       {
+        to: '/azure-billing/audit', label: 'Audit log', icon: ShieldCheck,
+        blurb: 'Who changed what in Azure Billing, when and why, with an exportable audit report.',
+      },
+      {
         to: '/azure-billing', label: 'Customers', icon: Users, end: true,
         blurb: 'Manage customers, upload customer/distributor/usage bills and compare reviewed invoice totals.',
       },
