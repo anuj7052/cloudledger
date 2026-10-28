@@ -47,6 +47,7 @@ export default function CombinedBillForm({ customerId, existing, period: initial
       {monthHasEntries && <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-600">This month already has subscription entries. Don't also enter the same distributor amount there, or it is counted twice.</p>}
       <div className="grid grid-cols-2 gap-3">
         <label className="text-xs text-slate-400">Month<input type="month" className={`${box} mt-1`} value={f.period} onChange={e => set({ period: e.target.value })} /></label>
+        <label className="col-span-2 text-xs text-slate-400">Distributor<input list="cb-dist2" className={`${box} mt-1`} value={f.distributor} onChange={e => set({ distributor: e.target.value })} placeholder="e.g. Redington" /><datalist id="cb-dist2">{['Redington', 'Savex', 'Tata', 'Ingram', 'Tech Data'].map(d => <option key={d} value={d} />)}</datalist></label>
         <label className="text-xs text-slate-400">Amounts are<select className={`${box} mt-1`} value={f.amount_basis} onChange={e => set({ amount_basis: e.target.value })}><option value="gross">including tax</option><option value="net">before tax</option></select></label>
       </div>
       {f.lines.map((l, i) => (
