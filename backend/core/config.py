@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     # database on purpose: an admin cannot be created by anything the app
     # itself exposes, only by whoever controls the deployment environment.
     ADMIN_EMAILS: str = ""
+    ACS_CONNECTION_STRING: str = ""
+    ACS_SENDER: str = ""
+    # While testing, every billing mail goes here instead of the customer.
+    BILLING_TEST_MAIL_TO: str = ""
 
     # --- BOQ chat assistant ---
     # Leave OPENAI_BASE_URL empty for api.openai.com, or point it at a gateway.

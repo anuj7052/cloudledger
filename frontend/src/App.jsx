@@ -31,6 +31,7 @@ const AzureBilling = lazy(() => import('./pages/AzureBilling'));
 const BillingDashboard = lazy(() => import('./pages/BillingDashboard'));
 const BillingEntries = lazy(() => import('./pages/BillingEntries'));
 const BillingAudit = lazy(() => import('./pages/BillingAudit'));
+const BillingPending = lazy(() => import('./pages/BillingPending'));
 const Onboarding     = lazy(() => import('./pages/Onboarding'));
 const AccessIdentity     = lazy(() => import('./pages/AccessIdentity'));
 const NetworkVisualizer  = lazy(() => import('./pages/NetworkVisualizer'));
@@ -298,6 +299,7 @@ function AppShell() {
             <Route path="/azure-billing/settings" element={<AzureBilling />} />
             <Route path="/azure-billing/mapping" element={<AzureBilling />} />
             <Route path="/azure-billing/audit" element={<BillingAudit />} />
+            <Route path="/azure-billing/pending" element={<BillingPending />} />
             <Route path="/azure-billing/dashboard" element={<BillingDashboard />} />
             <Route path="/azure-billing/entries" element={<BillingEntries />} />
             {/* Commitments was removed; old links land on the Cost dashboard. */}

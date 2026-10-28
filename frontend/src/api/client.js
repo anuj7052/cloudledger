@@ -1280,3 +1280,7 @@ export const deleteCombinedBill = id => api.delete(`/billing/combined-bills/${en
 
 export const fetchBillingAudit = params => api.get('/billing/audit', { params }).then(r => r.data);
 export const exportBillingAudit = params => api.get('/billing/audit-export.csv', { params, responseType: 'blob' }).then(r => r.data);
+export const fetchPendingBills = () => api.get('/billing/pending-bills').then(r => r.data);
+export const previewPendingMail = id => api.get(`/billing/pending-bills/${encodeURIComponent(id)}/preview`).then(r => r.data);
+export const approvePendingMail = id => api.post(`/billing/pending-bills/${encodeURIComponent(id)}/send`, {}).then(r => r.data);
+export const fetchReminderHistory = () => api.get('/billing/reminders').then(r => r.data);

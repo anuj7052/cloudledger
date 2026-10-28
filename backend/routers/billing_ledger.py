@@ -430,7 +430,7 @@ async def delete_extra_charge(charge_id: str, user=Depends(require_workspace_adm
 
 
 AUDIT_LABELS = {'customer': 'Customer', 'workload': 'Subscription', 'entry': 'Monthly entry', 'extra_charge': 'Extra charge',
-                'combined_bill': 'Tenant bill', 'service': 'PO / service', 'service_file': 'PO / BOQ document', 'service_note': 'PO note', 'document': 'Bill / invoice upload',
+                'combined_bill': 'Tenant bill', 'service': 'PO / service', 'service_file': 'PO / BOQ document', 'service_note': 'PO note', 'document': 'Bill / invoice upload', 'reminder': 'Payment reminder mail',
                 'azure_link': 'Azure mapping', 'import': 'Import'}
 SKIP = {'revision', 'updated_at', 'created_at', 'updated_by', 'owner_id', 'id', 'raw_cells', 'source_import_id', 'source_row'}
 

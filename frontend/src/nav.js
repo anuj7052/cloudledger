@@ -65,6 +65,10 @@ export const SECTIONS = [
         blurb: 'Link Azure subscriptions to billing customers so PO/BOQ notes show on the cost dashboard.',
       },
       {
+        to: '/azure-billing/pending', label: 'Pending bills', icon: Wallet,
+        blurb: 'Unpaid amounts by customer and month; approve and send reminder mails.',
+      },
+      {
         to: '/azure-billing/audit', label: 'Audit log', icon: ShieldCheck,
         blurb: 'Who changed what in Azure Billing, when and why, with an exportable audit report.',
       },

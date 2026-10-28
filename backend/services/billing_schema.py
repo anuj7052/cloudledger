@@ -107,6 +107,13 @@ SCHEMAS = {
         lines TEXT NOT NULL DEFAULT '[]', received_amount TEXT, payment_status TEXT NOT NULL DEFAULT '',
         created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
     )""",
+    "billing_reminders": """CREATE TABLE IF NOT EXISTS billing_reminders (
+        id TEXT PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id),
+        customer_id TEXT NOT NULL, sent_to TEXT NOT NULL, subject TEXT NOT NULL,
+        body TEXT NOT NULL, total_due TEXT NOT NULL, approved_by TEXT NOT NULL,
+        status TEXT NOT NULL, error TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+    )""",
     "billing_changes": """CREATE TABLE IF NOT EXISTS billing_changes (
         id TEXT PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id), entity_type TEXT NOT NULL,
         entity_id TEXT NOT NULL, action TEXT NOT NULL, before_json TEXT NOT NULL, after_json TEXT NOT NULL,
