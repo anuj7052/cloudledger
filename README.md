@@ -8,6 +8,33 @@
 
 **Know what Azure is costing you, and why it moved.**
 
+🌐 **Live app:** [azure.microsoftupdates.co.in](https://azure.microsoftupdates.co.in) · 📄 **Project page:** [anuj7052.github.io/cloudledger](https://anuj7052.github.io/cloudledger/) · 👤 **Author:** [Anuj Singh (@anuj7052)](https://github.com/anuj7052)
+
+![Cloudledger — Azure cost, explained](docs/images/hero.png)
+
+## Screenshots
+
+| Cost intelligence | Resource optimization |
+|---|---|
+| ![Azure cost intelligence](docs/images/cost-intelligence.png) | ![Azure resource optimization](docs/images/optimization.png) |
+| **Access & governance** | **Guides** |
+| ![Azure access governance](docs/images/governance.png) | ![Azure cost guides](docs/images/guides.png) |
+
+<details><summary>Full landing page</summary>
+
+![Cloudledger landing page](docs/images/landing.png)
+
+</details>
+
+### What you can do with Cloudledger
+- 📊 **Azure cost dashboard** — daily / monthly spend, pay-as-you-go vs RI, highlighted notes explaining every change
+- 🔍 **Cost Explorer** — service → resource group → resource → meter
+- 📑 **BOQ vs actual** — compare planned infrastructure cost with the real bill
+- 💼 **Azure Billing CRM** for CSP partners — customers, subscriptions, invoices, distributors (Redington, Tech Data, Tata…), profit, POs/BOQs with proof documents
+- 📬 **Pending bills & reminders** — month-wise dues, reminder mails sent only after approval (Azure Communication Services)
+- 🛡️ **Audit log** — who changed what, when and why, with exportable report
+- 🔐 Read-only by default, Microsoft Entra sign-in, your own Azure permissions
+
 A full-stack web app for tracking Azure cloud costs across **multiple tenants and subscriptions** — with 6-month trend analysis, per-service breakdown, anomaly detection, a CSV upload fallback, and a BOQ-to-infrastructure-as-code generator.
 
 Every screen reads. Calls to Azure are made with the signed-in user's own delegated permissions, so the app can never see more than the person using it. The one feature that produces infrastructure writes a template for you to review and run — it holds no write credentials for your subscription.
