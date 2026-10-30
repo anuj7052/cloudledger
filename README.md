@@ -12,7 +12,19 @@
 
 ![Cloudledger — Azure cost, explained](docs/images/hero.png)
 
-## Screenshots
+## Inside the app
+
+> Screens below use **demo data** (fictional customers) — no real customer information.
+
+| Cost dashboard with PO/BOQ notes | Azure Billing overview |
+|---|---|
+| ![Azure cost dashboard with highlighted PO and BOQ notes](docs/images/app-dashboard.png) | ![Azure billing overview: billing, distributor and profit](docs/images/app-billing-overview.png) |
+| **Add billing entry (invoice, distributor, payment)** | **Pending bills & approved reminders** |
+| ![Add Azure billing entry with distributor invoice and payment received](docs/images/app-add-entry.png) | ![Pending Azure bills by month with approved reminder mail](docs/images/app-pending-bills.png) |
+| **Services, POs & BOQs with proof** | **Audit log — who, what, when, why** |
+| ![Azure services, purchase orders and BOQ documents](docs/images/app-services-po.png) | ![Azure billing audit log](docs/images/app-audit-log.png) |
+
+## Website screenshots
 
 | Cost intelligence | Resource optimization |
 |---|---|

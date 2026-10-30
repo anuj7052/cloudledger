@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cloudledger — open-source Azure cost management app by Anuj Singh (anuj7052)</title>
-<meta name="description" content="Cloudledger is an open-source Azure cost management and FinOps app by Anuj Singh (anuj7052): daily Azure cost analysis, RI vs pay-as-you-go, BOQ vs actual, and an Azure billing CRM for CSP partners.">
+<title>Cloudledger — Azure cost management &amp; Azure billing app | Anuj Singh (anuj7052)</title>
+<meta name="description" content="Cloudledger: free open-source Azure cost management, Azure cost analysis and Azure billing software for CSP partners — daily cost dashboard, RI vs pay-as-you-go, BOQ vs actual, invoices, distributors, profit, pending bills and audit log. By Anuj Singh (anuj7052).">
 <meta name="author" content="Anuj Singh (anuj7052)">
 <link rel="canonical" href="https://anuj7052.github.io/cloudledger/">
 <meta property="og:title" content="Cloudledger — Azure cost, explained">
@@ -21,7 +21,7 @@ h1{font-size:44px;line-height:1.1;margin:40px 0 12px;color:#fff}h1 span{color:#f
 .btn{display:inline-block;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:600;margin:6px 8px 6px 0}
 .p{background:#ea580c;color:#fff}.s{border:1px solid #374151;color:#e5e7eb}
 img{width:100%;border-radius:14px;border:1px solid #1f2937}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
-ul{padding-left:20px}footer{color:#9ca3af;font-size:14px;margin-top:56px;border-top:1px solid #1f2937;padding-top:20px}
+ul{padding-left:20px}figure{margin:0}figcaption{font-size:13px;color:#9ca3af;margin-top:6px}footer{color:#9ca3af;font-size:14px;margin-top:56px;border-top:1px solid #1f2937;padding-top:20px}
 </style>
 </head>
 <body><div class="wrap">
@@ -40,6 +40,15 @@ ul{padding-left:20px}footer{color:#9ca3af;font-size:14px;margin-top:56px;border-
 <li>Microsoft Entra sign-in, read-only by default</li>
 </ul>
 <div class="grid"><img src="cost-intelligence.png" alt="Azure cost intelligence"><img src="optimization.png" alt="Azure resource optimization"><img src="governance.png" alt="Azure access governance"></div>
+<h2>Inside the app <small style="font-size:13px;color:#9ca3af">(demo data)</small></h2>
+<div class="grid">
+<figure><img src="app-dashboard.png" alt="Azure cost dashboard with PO and BOQ notes"><figcaption>Cost dashboard — daily spend, RI vs PAYG, highlighted PO/BOQ notes</figcaption></figure>
+<figure><img src="app-billing-overview.png" alt="Azure billing overview"><figcaption>Billing overview — billing, distributor, profit; click any chart</figcaption></figure>
+<figure><img src="app-add-entry.png" alt="Add Azure billing entry"><figcaption>Add entry — invoice, distributor invoice, payment received, tenant bills</figcaption></figure>
+<figure><img src="app-pending-bills.png" alt="Pending Azure bills and reminders"><figcaption>Pending bills — month-wise dues, reminder mail after approval</figcaption></figure>
+<figure><img src="app-services-po.png" alt="Azure services PO and BOQ tracking"><figcaption>Services &amp; POs — PO, BOQ, activation date, proof documents, notes</figcaption></figure>
+<figure><img src="app-audit-log.png" alt="Azure billing audit log"><figcaption>Audit log — who changed what, when and why; CSV report</figcaption></figure>
+</div>
 <h2>Tech stack</h2><p>Python FastAPI · React · Vite · Tailwind CSS · Azure (App Service, PostgreSQL, Blob Storage, Communication Services, OpenAI) · Microsoft Entra ID.</p>
 <footer>Cloudledger is made by <a href="https://github.com/anuj7052">Anuj Singh — anuj7052</a>. Source: <a href="https://github.com/anuj7052/cloudledger">github.com/anuj7052/cloudledger</a>.</footer>
 </div></body></html>
